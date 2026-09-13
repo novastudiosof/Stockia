@@ -117,6 +117,31 @@ export async function updateMaxAuxiliares(organizationId: string, maxAuxiliares:
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);
 }
 
+export async function updateOrganizationLimits(
+  organizationId: string,
+  maxCategorias: number,
+  maxProductosPorCategoria: number
+) {
+  const profile = await requireRole("super_admin");
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      max_categorias: maxCategorias,
+      max_productos_por_categoria: maxProductosPorCategoria,
+    })
+    .eq("id", organizationId);
+  if (error) return { error: "No se pudo actualizar los límites de catálogo" };
+
+  await logActivity(
+    profile,
+    "Actualizó límites de catálogo",
+    `${maxCategorias} categorías, ${maxProductosPorCategoria} productos c/u`
+  );
+  revalidatePath(`/superadmin/organizaciones/${organizationId}`);
+}
+
 export async function toggleOrganizationActive(organizationId: string, isActive: boolean) {
   const profile = await requireRole("super_admin");
   const supabase = await createClient();

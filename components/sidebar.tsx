@@ -13,6 +13,7 @@ import {
   Menu,
   Receipt,
   ShieldCheck,
+  ShoppingCart,
   User,
   X,
 } from "lucide-react";
@@ -22,7 +23,15 @@ import { cn } from "@/lib/utils";
 export interface SidebarNavItem {
   href: string;
   label: string;
-  icon: "catalogo" | "ventas" | "facturas" | "actividad" | "modulos" | "cuenta" | "superadmin";
+  icon:
+    | "catalogo"
+    | "ventas"
+    | "facturas"
+    | "actividad"
+    | "modulos"
+    | "cuenta"
+    | "superadmin"
+    | "ventasProductos";
   locked?: boolean;
 }
 
@@ -34,6 +43,7 @@ const ICONS = {
   modulos: LayoutGrid,
   cuenta: User,
   superadmin: ShieldCheck,
+  ventasProductos: ShoppingCart,
 };
 
 interface SidebarProps {

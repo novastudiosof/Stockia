@@ -24,7 +24,10 @@ export default async function FacturasPage() {
           Guarda las facturas de tus proveedores con su soporte adjunto.
         </p>
       </div>
-      <InvoicesTable invoices={(invoices as Invoice[]) ?? []} />
+      <InvoicesTable
+        invoices={(invoices as Invoice[]) ?? []}
+        canEdit={profile.role === "owner"}
+      />
     </div>
   );
 }

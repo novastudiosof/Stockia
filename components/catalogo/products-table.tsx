@@ -23,9 +23,10 @@ const currency = new Intl.NumberFormat("es-CO", {
 interface ProductsTableProps {
   categoryId: string;
   products: Product[];
+  canEdit: boolean;
 }
 
-export function ProductsTable({ categoryId, products }: ProductsTableProps) {
+export function ProductsTable({ categoryId, products, canEdit }: ProductsTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [addOpen, setAddOpen] = React.useState(false);
@@ -61,10 +62,12 @@ export function ProductsTable({ categoryId, products }: ProductsTableProps) {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Agregar producto
-        </Button>
+        {canEdit && (
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Agregar producto
+          </Button>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-brand-md)] border border-brand-border bg-white">
@@ -76,13 +79,13 @@ export function ProductsTable({ categoryId, products }: ProductsTableProps) {
               <th className="p-3 font-medium">Precio compra</th>
               <th className="p-3 font-medium">Precio venta</th>
               <th className="p-3 font-medium">Descripción</th>
-              <th className="p-3 font-medium text-right">Acciones</th>
+              {canEdit && <th className="p-3 font-medium text-right">Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-brand-muted">
+                <td colSpan={canEdit ? 6 : 5} className="p-6 text-center text-brand-muted">
                   No hay productos que coincidan.
                 </td>
               </tr>
@@ -101,41 +104,47 @@ export function ProductsTable({ categoryId, products }: ProductsTableProps) {
                 <td className="p-3">{currency.format(product.purchase_price)}</td>
                 <td className="p-3">{currency.format(product.sale_price)}</td>
                 <td className="p-3 text-brand-muted">{product.description || "—"}</td>
-                <td className="p-3">
-                  <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setEditing(product)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleting(product)}>
-                      <Trash2 className="h-4 w-4 text-brand-danger" />
-                    </Button>
-                  </div>
-                </td>
+                {canEdit && (
+                  <td className="p-3">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setEditing(product)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleting(product)}>
+                        <Trash2 className="h-4 w-4 text-brand-danger" />
+                      </Button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <ProductFormDialog open={addOpen} onOpenChange={setAddOpen} action={boundCreate} />
+      {canEdit && (
+        <>
+          <ProductFormDialog open={addOpen} onOpenChange={setAddOpen} action={boundCreate} />
 
-      {editing && boundUpdate && (
-        <ProductFormDialog
-          open={!!editing}
-          onOpenChange={(open) => !open && setEditing(null)}
-          product={editing}
-          action={boundUpdate}
-        />
+          {editing && boundUpdate && (
+            <ProductFormDialog
+              open={!!editing}
+              onOpenChange={(open) => !open && setEditing(null)}
+              product={editing}
+              action={boundUpdate}
+            />
+          )}
+
+          <ConfirmDialog
+            open={!!deleting}
+            onOpenChange={(open) => !open && setDeleting(null)}
+            title="Eliminar producto"
+            description={`¿Deseas eliminar "${deleting?.name}"? Esta acción no se puede deshacer.`}
+            isLoading={isDeleting}
+            onConfirm={handleDelete}
+          />
+        </>
       )}
-
-      <ConfirmDialog
-        open={!!deleting}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title="Eliminar producto"
-        description={`¿Deseas eliminar "${deleting?.name}"? Esta acción no se puede deshacer.`}
-        isLoading={isDeleting}
-        onConfirm={handleDelete}
-      />
     </div>
   );
 }

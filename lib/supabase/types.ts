@@ -6,6 +6,8 @@ export interface Organization {
   name: string;
   slug: string;
   max_auxiliares: number;
+  max_categorias: number;
+  max_productos_por_categoria: number;
   is_active: boolean;
   created_at: string;
 }
@@ -66,6 +68,24 @@ export interface Movement {
   amount: number;
   description: string | null;
   occurred_at: string;
+  file_path: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface SaleItem {
+  productId: string;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface Sale {
+  id: string;
+  organization_id: string;
+  items: SaleItem[];
+  total: number;
   created_by: string | null;
   created_at: string;
 }

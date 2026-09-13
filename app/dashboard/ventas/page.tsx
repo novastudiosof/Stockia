@@ -24,7 +24,10 @@ export default async function VentasPage() {
           Controla tus movimientos de dinero por rango de fechas.
         </p>
       </div>
-      <MovementsView movements={(movements as Movement[]) ?? []} />
+      <MovementsView
+        movements={(movements as Movement[]) ?? []}
+        canEdit={profile.role === "owner"}
+      />
     </div>
   );
 }

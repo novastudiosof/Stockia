@@ -19,12 +19,19 @@ interface InvoiceFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoice?: Invoice;
+  warnNoEdit?: boolean;
   action: (prev: { error?: string } | void, formData: FormData) => Promise<{ error?: string } | void>;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function InvoiceFormDialog({ open, onOpenChange, invoice, action }: InvoiceFormDialogProps) {
+export function InvoiceFormDialog({
+  open,
+  onOpenChange,
+  invoice,
+  warnNoEdit = false,
+  action,
+}: InvoiceFormDialogProps) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const formRef = React.useRef<HTMLFormElement>(null);
 
@@ -91,6 +98,13 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice, action }: Invoi
               </p>
             )}
           </div>
+
+          {!invoice && warnNoEdit && (
+            <p className="rounded-[var(--radius-brand-sm)] bg-amber-50 p-2 text-xs text-amber-800">
+              Una vez guardada, esta factura no podrás editarla ni eliminarla. Verifica los datos
+              antes de continuar.
+            </p>
+          )}
 
           {state?.error && <p className="text-sm text-brand-danger">{state.error}</p>}
 

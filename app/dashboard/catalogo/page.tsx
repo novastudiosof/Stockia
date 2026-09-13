@@ -25,6 +25,7 @@ export default async function CatalogoPage() {
   }
 
   const list = (categories as Category[]) ?? [];
+  const canEdit = profile.role === "owner";
 
   return (
     <div className="flex flex-col gap-6">
@@ -35,7 +36,7 @@ export default async function CatalogoPage() {
             Organiza tus productos por categorías.
           </p>
         </div>
-        <AddCategoryButton />
+        {canEdit && <AddCategoryButton />}
       </div>
 
       {list.length === 0 ? (
@@ -49,6 +50,7 @@ export default async function CatalogoPage() {
               key={category.id}
               category={category}
               productCount={countsByCategory.get(category.id) ?? 0}
+              canEdit={canEdit}
             />
           ))}
         </div>

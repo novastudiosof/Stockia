@@ -15,6 +15,7 @@ export async function createCategory(
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
+  if (profile.role !== "owner") return { error: "Solo el administrador puede crear categorías" };
 
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
@@ -24,6 +25,22 @@ export async function createCategory(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
   const supabase = await createClient();
+
+  const [{ data: org }, { count }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("max_categorias")
+      .eq("id", profile.organization_id)
+      .single(),
+    supabase
+      .from("categories")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", profile.organization_id),
+  ]);
+  if (org && (count ?? 0) >= org.max_categorias) {
+    return { error: `Alcanzaste el máximo de ${org.max_categorias} categorías de tu plan` };
+  }
+
   const { error } = await supabase.from("categories").insert({
     organization_id: profile.organization_id,
     name: parsed.data.name,
@@ -42,6 +59,7 @@ export async function updateCategory(
   formData: FormData
 ): Promise<ActionResult> {
   const profile = await requireProfile();
+  if (profile.role !== "owner") return { error: "Solo el administrador puede editar categorías" };
 
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
@@ -63,6 +81,7 @@ export async function updateCategory(
 
 export async function deleteCategory(categoryId: string, categoryName: string) {
   const profile = await requireProfile();
+  if (profile.role !== "owner") return { error: "Solo el administrador puede eliminar categorías" };
   const supabase = await createClient();
 
   const { error } = await supabase.from("categories").delete().eq("id", categoryId);
@@ -79,6 +98,7 @@ export async function createProduct(
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
+  if (profile.role !== "owner") return { error: "Solo el administrador puede crear productos" };
 
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
@@ -90,6 +110,24 @@ export async function createProduct(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
   const supabase = await createClient();
+
+  const [{ data: org }, { count }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("max_productos_por_categoria")
+      .eq("id", profile.organization_id)
+      .single(),
+    supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("category_id", categoryId),
+  ]);
+  if (org && (count ?? 0) >= org.max_productos_por_categoria) {
+    return {
+      error: `Alcanzaste el máximo de ${org.max_productos_por_categoria} productos por categoría de tu plan`,
+    };
+  }
+
   const { error } = await supabase.from("products").insert({
     organization_id: profile.organization_id,
     category_id: categoryId,
@@ -113,6 +151,7 @@ export async function updateProduct(
   formData: FormData
 ): Promise<ActionResult> {
   const profile = await requireProfile();
+  if (profile.role !== "owner") return { error: "Solo el administrador puede editar productos" };
 
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
@@ -146,6 +185,7 @@ export async function deleteProduct(
   productName: string
 ) {
   const profile = await requireProfile();
+  if (profile.role !== "owner") return { error: "Solo el administrador puede eliminar productos" };
   const supabase = await createClient();
 
   const { error } = await supabase.from("products").delete().eq("id", productId);

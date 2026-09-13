@@ -20,6 +20,7 @@ interface MovementFormDialogProps {
   onOpenChange: (open: boolean) => void;
   movement?: Movement;
   defaultType?: MovementType;
+  warnNoEdit?: boolean;
   action: (prev: { error?: string } | void, formData: FormData) => Promise<{ error?: string } | void>;
 }
 
@@ -30,6 +31,7 @@ export function MovementFormDialog({
   onOpenChange,
   movement,
   defaultType = "venta",
+  warnNoEdit = false,
   action,
 }: MovementFormDialogProps) {
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -103,6 +105,20 @@ export function MovementFormDialog({
             <Label htmlFor="description">Descripción</Label>
             <Input id="description" name="description" defaultValue={movement?.description ?? ""} />
           </div>
+
+          {!movement && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="file">Archivo adjunto (opcional)</Label>
+              <Input id="file" name="file" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" />
+            </div>
+          )}
+
+          {!movement && warnNoEdit && (
+            <p className="rounded-[var(--radius-brand-sm)] bg-amber-50 p-2 text-xs text-amber-800">
+              Una vez guardado, este movimiento no podrás editarlo ni eliminarlo. Verifica los datos
+              antes de continuar.
+            </p>
+          )}
 
           {state?.error && <p className="text-sm text-brand-danger">{state.error}</p>}
 

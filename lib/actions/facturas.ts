@@ -81,6 +81,7 @@ export async function updateInvoice(
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
+  if (profile.role !== "owner") return { error: "Solo el administrador puede editar facturas" };
   await requireModule(profile.organization_id, MODULE_KEYS.FACTURAS);
 
   const parsed = invoiceSchema.safeParse({
@@ -129,6 +130,7 @@ export async function updateInvoice(
 export async function deleteInvoice(invoiceId: string, filePath: string | null, provider: string) {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
+  if (profile.role !== "owner") return { error: "Solo el administrador puede eliminar facturas" };
   await requireModule(profile.organization_id, MODULE_KEYS.FACTURAS);
 
   const supabase = await createClient();

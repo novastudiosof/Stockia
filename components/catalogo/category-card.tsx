@@ -15,9 +15,10 @@ import type { Category } from "@/lib/supabase/types";
 interface CategoryCardProps {
   category: Category;
   productCount: number;
+  canEdit: boolean;
 }
 
-export function CategoryCard({ category, productCount }: CategoryCardProps) {
+export function CategoryCard({ category, productCount, canEdit }: CategoryCardProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -36,24 +37,26 @@ export function CategoryCard({ category, productCount }: CategoryCardProps) {
   return (
     <>
       <Card className="group relative flex flex-col gap-3 p-4 transition-shadow hover:shadow-md">
-        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setEditOpen(true)}
-            aria-label="Editar categoría"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setConfirmOpen(true)}
-            aria-label="Eliminar categoría"
-          >
-            <Trash2 className="h-4 w-4 text-brand-danger" />
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setEditOpen(true)}
+              aria-label="Editar categoría"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setConfirmOpen(true)}
+              aria-label="Eliminar categoría"
+            >
+              <Trash2 className="h-4 w-4 text-brand-danger" />
+            </Button>
+          </div>
+        )}
 
         <Link href={`/dashboard/catalogo/${category.id}`} className="flex flex-col gap-3">
           <div

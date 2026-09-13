@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MovementFormDialog } from "@/components/ventas/movement-form-dialog";
-import { createMovement, updateMovement, deleteMovement } from "@/lib/actions/ventas";
+import {
+  createMovement,
+  updateMovement,
+  deleteMovement,
+  getMovementFileUrl,
+} from "@/lib/actions/ventas";
 import type { Movement } from "@/lib/supabase/types";
 
 const currency = new Intl.NumberFormat("es-CO", {
@@ -26,9 +31,10 @@ function todayISO() {
 
 interface MovementsViewProps {
   movements: Movement[];
+  canEdit: boolean;
 }
 
-export function MovementsView({ movements }: MovementsViewProps) {
+export function MovementsView({ movements, canEdit }: MovementsViewProps) {
   const router = useRouter();
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
@@ -60,6 +66,11 @@ export function MovementsView({ movements }: MovementsViewProps) {
     setIsDeleting(false);
     setDeleting(null);
     router.refresh();
+  }
+
+  async function handleOpenFile(filePath: string) {
+    const url = await getMovementFileUrl(filePath);
+    if (url) window.open(url, "_blank");
   }
 
   return (
@@ -132,13 +143,14 @@ export function MovementsView({ movements }: MovementsViewProps) {
               <th className="p-3 font-medium">Tipo</th>
               <th className="p-3 font-medium">Descripción</th>
               <th className="p-3 font-medium">Monto</th>
-              <th className="p-3 font-medium text-right">Acciones</th>
+              <th className="p-3 font-medium">Archivo</th>
+              {canEdit && <th className="p-3 font-medium text-right">Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-brand-muted">
+                <td colSpan={canEdit ? 6 : 5} className="p-6 text-center text-brand-muted">
                   No hay movimientos en este rango.
                 </td>
               </tr>
@@ -154,24 +166,45 @@ export function MovementsView({ movements }: MovementsViewProps) {
                 <td className="p-3 text-brand-muted">{movement.description || "—"}</td>
                 <td className="p-3 font-medium">{currency.format(movement.amount)}</td>
                 <td className="p-3">
-                  <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setEditing(movement)}>
-                      <Pencil className="h-4 w-4" />
+                  {movement.file_path ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenFile(movement.file_path as string)}
+                      aria-label="Ver archivo adjunto"
+                    >
+                      <Paperclip className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleting(movement)}>
-                      <Trash2 className="h-4 w-4 text-brand-danger" />
-                    </Button>
-                  </div>
+                  ) : (
+                    "—"
+                  )}
                 </td>
+                {canEdit && (
+                  <td className="p-3">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setEditing(movement)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleting(movement)}>
+                        <Trash2 className="h-4 w-4 text-brand-danger" />
+                      </Button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <MovementFormDialog open={addOpen} onOpenChange={setAddOpen} action={createMovement} />
+      <MovementFormDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        action={createMovement}
+        warnNoEdit={!canEdit}
+      />
 
-      {editing && boundUpdate && (
+      {canEdit && editing && boundUpdate && (
         <MovementFormDialog
           open={!!editing}
           onOpenChange={(open) => !open && setEditing(null)}
@@ -180,14 +213,16 @@ export function MovementsView({ movements }: MovementsViewProps) {
         />
       )}
 
-      <ConfirmDialog
-        open={!!deleting}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title="Eliminar movimiento"
-        description="¿Deseas eliminar este movimiento? Esta acción no se puede deshacer."
-        isLoading={isDeleting}
-        onConfirm={handleDelete}
-      />
+      {canEdit && (
+        <ConfirmDialog
+          open={!!deleting}
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title="Eliminar movimiento"
+          description="¿Deseas eliminar este movimiento? Esta acción no se puede deshacer."
+          isLoading={isDeleting}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 }

@@ -24,9 +24,10 @@ const currency = new Intl.NumberFormat("es-CO", {
 
 interface InvoicesTableProps {
   invoices: Invoice[];
+  canEdit: boolean;
 }
 
-export function InvoicesTable({ invoices }: InvoicesTableProps) {
+export function InvoicesTable({ invoices, canEdit }: InvoicesTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [addOpen, setAddOpen] = React.useState(false);
@@ -113,12 +114,16 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
                         <Download className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" onClick={() => setEditing(invoice)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleting(invoice)}>
-                      <Trash2 className="h-4 w-4 text-brand-danger" />
-                    </Button>
+                    {canEdit && (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => setEditing(invoice)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setDeleting(invoice)}>
+                          <Trash2 className="h-4 w-4 text-brand-danger" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -127,9 +132,14 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
         </table>
       </div>
 
-      <InvoiceFormDialog open={addOpen} onOpenChange={setAddOpen} action={createInvoice} />
+      <InvoiceFormDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        action={createInvoice}
+        warnNoEdit={!canEdit}
+      />
 
-      {editing && boundUpdate && (
+      {canEdit && editing && boundUpdate && (
         <InvoiceFormDialog
           open={!!editing}
           onOpenChange={(open) => !open && setEditing(null)}
@@ -138,14 +148,16 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
         />
       )}
 
-      <ConfirmDialog
-        open={!!deleting}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title="Eliminar factura"
-        description={`¿Deseas eliminar la factura de "${deleting?.provider}"? Esta acción no se puede deshacer.`}
-        isLoading={isDeleting}
-        onConfirm={handleDelete}
-      />
+      {canEdit && (
+        <ConfirmDialog
+          open={!!deleting}
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title="Eliminar factura"
+          description={`¿Deseas eliminar la factura de "${deleting?.provider}"? Esta acción no se puede deshacer.`}
+          isLoading={isDeleting}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 }

@@ -47,7 +47,11 @@ export default async function CategoryDetailPage({
         </h1>
       </div>
 
-      <ProductsTable categoryId={categoryId} products={(products as Product[]) ?? []} />
+      <ProductsTable
+        categoryId={categoryId}
+        products={(products as Product[]) ?? []}
+        canEdit={profile.role === "owner"}
+      />
     </div>
   );
 }

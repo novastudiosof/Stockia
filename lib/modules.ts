@@ -7,6 +7,7 @@ import type { ModuleDef, OrganizationModule } from "@/lib/supabase/types";
 export const MODULE_KEYS = {
   VENTAS_GASTOS: "ventas_gastos",
   FACTURAS: "facturas",
+  VENTAS_PRODUCTOS: "ventas_productos",
 } as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[keyof typeof MODULE_KEYS];

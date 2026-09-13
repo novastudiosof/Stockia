@@ -8,19 +8,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { updateMaxAuxiliares, toggleOrganizationActive } from "@/lib/actions/superadmin";
+import {
+  updateMaxAuxiliares,
+  updateOrganizationLimits,
+  toggleOrganizationActive,
+} from "@/lib/actions/superadmin";
 import type { Organization } from "@/lib/supabase/types";
+
+const CATEGORIA_STEPS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5); // 5..100
+const PRODUCTO_STEPS = Array.from({ length: 20 }, (_, i) => (i + 1) * 50); // 50..1000
 
 export function OrganizationSettings({ organization }: { organization: Organization }) {
   const router = useRouter();
   const [maxAuxiliares, setMaxAuxiliares] = React.useState(organization.max_auxiliares);
+  const [maxCategorias, setMaxCategorias] = React.useState(organization.max_categorias);
+  const [maxProductos, setMaxProductos] = React.useState(
+    organization.max_productos_por_categoria
+  );
   const [saving, setSaving] = React.useState(false);
+  const [savingCatalogo, setSavingCatalogo] = React.useState(false);
   const [togglingActive, setTogglingActive] = React.useState(false);
 
   async function handleSaveLimit() {
     setSaving(true);
     await updateMaxAuxiliares(organization.id, maxAuxiliares);
     setSaving(false);
+    router.refresh();
+  }
+
+  async function handleSaveCatalogoLimits() {
+    setSavingCatalogo(true);
+    await updateOrganizationLimits(organization.id, maxCategorias, maxProductos);
+    setSavingCatalogo(false);
     router.refresh();
   }
 
@@ -70,6 +89,58 @@ export function OrganizationSettings({ organization }: { organization: Organizat
               {saving ? "Guardando..." : "Guardar"}
             </Button>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:max-w-sm">
+          <div>
+            <p className="font-medium text-brand-ink">Límites de catálogo</p>
+            <p className="text-sm text-brand-muted">
+              Solo define el tope; las categorías y productos las crea la propia
+              organización desde su Catálogo.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="maxCategorias">Máximo de categorías</Label>
+            <select
+              id="maxCategorias"
+              className="h-9 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+              value={maxCategorias}
+              onChange={(event) => setMaxCategorias(Number(event.target.value))}
+            >
+              {CATEGORIA_STEPS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="maxProductos">Máximo de productos por categoría</Label>
+            <select
+              id="maxProductos"
+              className="h-9 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+              value={maxProductos}
+              onChange={(event) => setMaxProductos(Number(event.target.value))}
+            >
+              {PRODUCTO_STEPS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            variant="outline"
+            className="self-start"
+            onClick={handleSaveCatalogoLimits}
+            disabled={
+              savingCatalogo ||
+              (maxCategorias === organization.max_categorias &&
+                maxProductos === organization.max_productos_por_categoria)
+            }
+          >
+            {savingCatalogo ? "Guardando..." : "Guardar límites"}
+          </Button>
         </div>
       </CardContent>
     </Card>

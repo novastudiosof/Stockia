@@ -16,43 +16,53 @@ export default async function DashboardLayout({
 }) {
   const profile = await requireProfile();
 
-  const modules = profile.organization_id
-    ? await getModulesWithStatus(profile.organization_id)
-    : [];
+  const isSuperAdmin = profile.role === "super_admin";
+
+  const modules =
+    profile.organization_id && !isSuperAdmin
+      ? await getModulesWithStatus(profile.organization_id)
+      : [];
 
   const isModuleEnabled = (key: string) =>
     modules.find((m) => m.key === key)?.enabled ?? false;
 
-  const items: SidebarNavItem[] = [
-    { href: "/dashboard/catalogo", label: "Catálogo", icon: "catalogo" },
-    {
+  const items: SidebarNavItem[] = [];
+
+  if (isSuperAdmin) {
+    items.push({ href: "/superadmin", label: "Organizaciones", icon: "superadmin" });
+  } else {
+    items.push({ href: "/dashboard/catalogo", label: "Catálogo", icon: "catalogo" });
+    items.push({
       href: "/dashboard/ventas",
       label: "Ventas y Gastos",
       icon: "ventas",
       locked: !isModuleEnabled(MODULE_KEYS.VENTAS_GASTOS),
-    },
-    {
+    });
+    items.push({
       href: "/dashboard/facturas",
       label: "Facturas",
       icon: "facturas",
       locked: !isModuleEnabled(MODULE_KEYS.FACTURAS),
-    },
-  ];
-
-  if (profile.role === "owner" || profile.role === "super_admin") {
-    items.push({
-      href: "/dashboard/actividad",
-      label: "Registro de Actividad",
-      icon: "actividad",
     });
+    items.push({
+      href: "/dashboard/ventas-productos",
+      label: "Ventas por Productos",
+      icon: "ventasProductos",
+      locked: !isModuleEnabled(MODULE_KEYS.VENTAS_PRODUCTOS),
+    });
+
+    if (profile.role === "owner") {
+      items.push({
+        href: "/dashboard/actividad",
+        label: "Registro de Actividad",
+        icon: "actividad",
+      });
+    }
+
+    items.push({ href: "/dashboard/modulos", label: "Módulos", icon: "modulos" });
   }
 
-  items.push({ href: "/dashboard/modulos", label: "Módulos", icon: "modulos" });
   items.push({ href: "/dashboard/cuenta", label: "Mi Cuenta", icon: "cuenta" });
-
-  if (profile.role === "super_admin") {
-    items.push({ href: "/superadmin", label: "Super Admin", icon: "superadmin" });
-  }
 
   return (
     <div className="flex min-h-screen bg-background">
