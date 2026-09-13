@@ -19,6 +19,7 @@ interface ConfirmDialogProps {
   title: string;
   description: React.ReactNode;
   confirmLabel?: string;
+  loadingLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void | Promise<void>;
   isLoading?: boolean;
@@ -30,6 +31,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = "Eliminar",
+  loadingLabel = "Eliminando...",
   cancelLabel = "Cancelar",
   onConfirm,
   isLoading,
@@ -50,7 +52,7 @@ export function ConfirmDialog({
               void onConfirm();
             }}
           >
-            {isLoading ? "Eliminando..." : confirmLabel}
+            {isLoading ? loadingLabel : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

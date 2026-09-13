@@ -57,6 +57,7 @@ export default async function DashboardLayout({
         label: "Registro de Actividad",
         icon: "actividad",
       });
+      items.push({ href: "/dashboard/informes", label: "Informes", icon: "informes" });
     }
 
     items.push({ href: "/dashboard/modulos", label: "Módulos", icon: "modulos" });

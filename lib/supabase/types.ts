@@ -88,6 +88,8 @@ export interface Sale {
   total: number;
   created_by: string | null;
   created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
 }
 
 export interface Invoice {

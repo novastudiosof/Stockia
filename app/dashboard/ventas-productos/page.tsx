@@ -39,7 +39,7 @@ export default async function VentasProductosPage() {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-brand-ink">Ventas recientes</h2>
-        <SalesHistory sales={(sales as Sale[]) ?? []} />
+        <SalesHistory sales={(sales as Sale[]) ?? []} canVoid={profile.role === "owner"} />
       </div>
     </div>
   );

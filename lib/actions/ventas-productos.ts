@@ -36,3 +36,19 @@ export async function createSale(
 
   return { saleId: data.sale_id, total: data.total };
 }
+
+export async function voidSale(saleId: string): Promise<ActionResult> {
+  const profile = await requireProfile();
+  if (!profile.organization_id) return { error: "Sin organización asociada" };
+  if (profile.role !== "owner") return { error: "Solo el administrador puede anular una venta" };
+  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("void_sale", { p_sale_id: saleId });
+  if (error) return { error: error.message || "No se pudo anular la venta" };
+
+  await logActivity(profile, "Anuló venta de productos", saleId);
+  revalidatePath("/dashboard/ventas-productos");
+  revalidatePath("/dashboard/catalogo");
+  return {};
+}

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BarChart3,
   Boxes,
   ClipboardList,
   FileText,
@@ -31,7 +32,8 @@ export interface SidebarNavItem {
     | "modulos"
     | "cuenta"
     | "superadmin"
-    | "ventasProductos";
+    | "ventasProductos"
+    | "informes";
   locked?: boolean;
 }
 
@@ -44,6 +46,7 @@ const ICONS = {
   cuenta: User,
   superadmin: ShieldCheck,
   ventasProductos: ShoppingCart,
+  informes: BarChart3,
 };
 
 interface SidebarProps {
