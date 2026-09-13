@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistema de Inventario
 
-## Getting Started
+Sistema de inventario multi-negocio (Next.js + Supabase). Un solo código y una
+sola base de datos sirven a todos los clientes (ferretería, panadería, etc.),
+aislados entre sí por organización y con módulos que se activan/desactivan
+por cliente desde el panel de super administrador.
 
-First, run the development server:
+## 1. Crear el proyecto de Supabase
+
+1. Crea una cuenta/proyecto en [supabase.com](https://supabase.com).
+2. En **Project Settings → API**, copia `Project URL`, `anon public key` y
+   `service_role key`.
+3. Copia `.env.example` a `.env.local` y completa esos valores.
+4. En el **SQL Editor** de Supabase, ejecuta en orden los archivos de `sql/`:
+   `001_schema.sql`, `002_rls_policies.sql`, `003_seed_modules.sql`,
+   `004_storage.sql`.
+
+## 2. Crear el primer super administrador
+
+Este paso se hace una sola vez, a mano (no existe UI para crear el primer
+super admin, a propósito — solo tú debes poder crearlo):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+node --env-file=.env.local scripts/bootstrap-super-admin.mjs <usuario> <contraseña> "<Tu nombre>"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 3. Desarrollo local
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Abre [http://localhost:3000](http://localhost:3000), inicia sesión con el
+usuario del super admin y entra a **Super Admin** para crear tu primera
+organización (negocio) y su usuario administrador (owner).
 
-## Learn More
+## 4. Desplegar en Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Sube este repositorio a GitHub.
+2. En [vercel.com](https://vercel.com), importa el repositorio.
+3. En **Settings → Environment Variables**, agrega las mismas variables de
+   `.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_INVOICES_BUCKET`).
+4. Despliega. Cada push a la rama principal vuelve a desplegar automáticamente.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Cómo vender el sistema a un nuevo negocio
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Como super admin, entra a **Super Admin → Nueva organización** y crea el
+   negocio con su usuario administrador (owner) y contraseña inicial.
+2. Activa los módulos pagos que haya contratado (Ventas y Gastos, Facturas)
+   desde el detalle de esa organización.
+3. Ajusta cuántos usuarios auxiliares incluye su plan.
+4. Entrega al cliente su usuario y contraseña; el resto (categorías,
+   productos, ventas, facturas) lo carga él mismo desde el sistema.
 
-## Deploy on Vercel
+## Arquitectura
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Next.js (App Router) + TypeScript + Tailwind CSS.**
+- **Supabase**: Postgres (multi-tenant compartido con `organization_id` +
+  Row Level Security), Auth (login por usuario, no por email — ver
+  `app/api/auth/login/route.ts`) y Storage (adjuntos de facturas).
+- **Roles**: `super_admin` (tú), `owner` (dueño del negocio, uno por
+  organización), `auxiliar` (creado por el owner, limitado por
+  `organizations.max_auxiliares`).
+- **Módulos pagos**: `modules` + `organization_modules`, activados/desactivados
+  manualmente desde `/superadmin`. El gating se valida en cada página y en
+  cada server action del módulo (`lib/modules.ts`), no solo en el menú.
