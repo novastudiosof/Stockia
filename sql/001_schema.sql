@@ -64,7 +64,12 @@ create table if not exists categories (
   icon text not null default '📦',
   color text not null default '#F59E0B',
   image_url text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Permite el FK compuesto de products de abajo, que obliga a que el
+  -- category_id de un producto pertenezca a la MISMA organización que su
+  -- organization_id (si no, un cliente podría enlazar (a mano, vía API)
+  -- un producto a la categoría de otra organización).
+  unique (id, organization_id)
 );
 
 create index if not exists categories_organization_id_idx on categories (organization_id);
@@ -72,14 +77,16 @@ create index if not exists categories_organization_id_idx on categories (organiz
 create table if not exists products (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations (id) on delete cascade,
-  category_id uuid not null references categories (id) on delete cascade,
+  category_id uuid not null,
   name text not null,
   quantity int not null default 0,
   description text,
   purchase_price numeric(12, 2) not null default 0,
   sale_price numeric(12, 2) not null default 0,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  foreign key (category_id, organization_id)
+    references categories (id, organization_id) on delete cascade
 );
 
 create index if not exists products_organization_id_idx on products (organization_id);
@@ -165,3 +172,35 @@ drop trigger if exists profiles_prevent_username_change on profiles;
 create trigger profiles_prevent_username_change
   before update on profiles
   for each row execute function prevent_username_change();
+
+-- La política RLS "profiles_update_self" permite a cada usuario actualizar
+-- SU PROPIA fila (para casos futuros como editar full_name), pero no
+-- restringe columnas. Sin este trigger, cualquier usuario autenticado
+-- podría llamar a `supabase.from('profiles').update({ role: 'super_admin' })`
+-- desde el navegador y escalar privilegios. El código de la aplicación
+-- nunca actualiza `role` ni `organization_id` después de crear el perfil
+-- (se fijan una sola vez, al insertar) — solo la service role key debería
+-- poder cambiarlos, y esta se salta RLS pero NO los triggers, así que
+-- deben quedar explícitamente permitidos para el rol usado por esa key.
+create or replace function prevent_privileged_field_change()
+returns trigger as $$
+begin
+  -- auth.role() refleja el rol del JWT de Supabase ('anon', 'authenticated'
+  -- o 'service_role'), a diferencia de current_setting('role') que refleja
+  -- el rol de Postgres — este es el helper correcto para distinguir
+  -- llamadas hechas con la service role key.
+  if new.role <> old.role and coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'No autorizado para cambiar el rol de un usuario';
+  end if;
+  if new.organization_id is distinct from old.organization_id
+     and coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'No autorizado para cambiar la organización de un usuario';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists profiles_prevent_privileged_field_change on profiles;
+create trigger profiles_prevent_privileged_field_change
+  before update on profiles
+  for each row execute function prevent_privileged_field_change();
