@@ -58,7 +58,7 @@ export function Sidebar({ fullName, roleLabel, items }: SidebarProps) {
       <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
         <Image src="/brand/logo.svg" alt="Logo" width={40} height={40} />
         <div>
-          <p className="text-sm font-semibold leading-tight">Sistema de Inventario</p>
+          <p className="text-sm font-semibold leading-tight">Stockia</p>
           <p className="text-xs text-white/60">{roleLabel}</p>
         </div>
       </div>
@@ -106,7 +106,7 @@ export function Sidebar({ fullName, roleLabel, items }: SidebarProps) {
       <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between bg-brand-ink px-4 py-3 text-white md:hidden">
         <div className="flex items-center gap-2">
           <Image src="/brand/logo.svg" alt="Logo" width={28} height={28} />
-          <span className="text-sm font-semibold">Sistema de Inventario</span>
+          <span className="text-sm font-semibold">Stockia</span>
         </div>
         <button onClick={() => setOpen(true)} aria-label="Abrir menú">
           <Menu className="h-6 w-6" />

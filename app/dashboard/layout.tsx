@@ -1,6 +1,7 @@
 import { requireProfile } from "@/lib/auth";
 import { getModulesWithStatus, MODULE_KEYS } from "@/lib/modules";
 import { Sidebar, type SidebarNavItem } from "@/components/sidebar";
+import { BrandFooter } from "@/components/brand-footer";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super administrador",
@@ -60,8 +61,9 @@ export default async function DashboardLayout({
         roleLabel={ROLE_LABELS[profile.role] ?? profile.role}
         items={items}
       />
-      <main className="flex-1 px-4 py-6 pt-20 md:px-8 md:py-8 md:pt-8">
-        <div className="mx-auto w-full max-w-6xl">{children}</div>
+      <main className="flex flex-1 flex-col px-4 py-6 pt-20 md:px-8 md:py-8 md:pt-8">
+        <div className="mx-auto w-full max-w-6xl flex-1">{children}</div>
+        <BrandFooter />
       </main>
     </div>
   );

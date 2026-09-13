@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sistema de Inventario",
-  description: "Control de inventario, ventas, gastos y facturas para tu negocio.",
+  title: "Stockia",
+  description: "Stockia — control de inventario, ventas, gastos y facturas para tu negocio.",
   icons: { icon: "/brand/logo.svg" },
 };
 

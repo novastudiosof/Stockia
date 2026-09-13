@@ -8,6 +8,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BrandFooter } from "@/components/brand-footer";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -46,14 +47,12 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-brand-ink px-4">
+    <main className="relative flex min-h-screen items-center justify-center bg-brand-ink px-4">
       <div className="w-full max-w-sm rounded-[var(--radius-brand-lg)] bg-white p-8 shadow-lg">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <Image src="/brand/logo.svg" alt="Logo" width={72} height={72} priority />
           <div>
-            <h1 className="text-xl font-semibold text-brand-ink">
-              Sistema de Inventario
-            </h1>
+            <h1 className="text-xl font-semibold text-brand-ink">Stockia</h1>
             <p className="text-sm text-brand-muted">Inicia sesión para continuar</p>
           </div>
         </div>
@@ -104,6 +103,9 @@ export default function LoginPage() {
             Ingresar
           </Button>
         </form>
+      </div>
+      <div className="absolute inset-x-0 bottom-0">
+        <BrandFooter className="text-white/50 [&_a]:text-white/80" />
       </div>
     </main>
   );

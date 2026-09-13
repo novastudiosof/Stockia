@@ -1,9 +1,10 @@
-# Sistema de Inventario
+# Stockia
 
-Sistema de inventario multi-negocio (Next.js + Supabase). Un solo código y una
-sola base de datos sirven a todos los clientes (ferretería, panadería, etc.),
-aislados entre sí por organización y con módulos que se activan/desactivan
-por cliente desde el panel de super administrador.
+Software de inventario multi-negocio (Next.js + Supabase), desarrollado por
+NOVA STUDIO. Un solo código y una sola base de datos sirven a todos los
+clientes que lo compren (FerreAmigo es uno de ellos), aislados entre sí por
+organización y con módulos que se activan/desactivan por cliente desde el
+panel de super administrador.
 
 ## 1. Crear el proyecto de Supabase
 
