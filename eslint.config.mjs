@@ -5,6 +5,14 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    rules: {
+      // Se usa deliberadamente para sincronizar diálogos con el resultado
+      // de server actions (useActionState) y para resetear formularios al
+      // reabrir un modal — un patrón estándar en Next.js App Router.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
