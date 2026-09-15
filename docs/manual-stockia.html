@@ -1,0 +1,875 @@
+<title>Manual Stockia</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --paper:#FAF7F1;
+    --surface:#FFFFFF;
+    --surface-alt:#F1EADA;
+    --ink:#211D17;
+    --muted:#6E6455;
+    --border:#E4DCC9;
+    --accent:#B5651D;
+    --accent-ink:#5A3410;
+    --accent-soft:#F1DEC0;
+    --success:#2F7D4F;
+    --success-soft:#DEEEE2;
+    --danger:#B23B3B;
+    --danger-soft:#F3E1DF;
+    --radius-md:10px;
+    --radius-sm:6px;
+    --shadow-card:0 1px 2px rgba(33,29,23,.06), 0 6px 20px rgba(33,29,23,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#17140F;
+      --surface:#201B14;
+      --surface-alt:#29221A;
+      --ink:#F4EEE1;
+      --muted:#B4A88F;
+      --border:#3B3225;
+      --accent:#E38C3E;
+      --accent-ink:#FFDCB0;
+      --accent-soft:#3A2A16;
+      --success:#54B57E;
+      --success-soft:#20302A;
+      --danger:#E37B72;
+      --danger-soft:#332221;
+      --shadow-card:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#17140F;
+    --surface:#201B14;
+    --surface-alt:#29221A;
+    --ink:#F4EEE1;
+    --muted:#B4A88F;
+    --border:#3B3225;
+    --accent:#E38C3E;
+    --accent-ink:#FFDCB0;
+    --accent-soft:#3A2A16;
+    --success:#54B57E;
+    --success-soft:#20302A;
+    --danger:#E37B72;
+    --danger-soft:#332221;
+    --shadow-card:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Archivo','Arial Narrow',sans-serif;
+    text-wrap:balance;
+    color:var(--ink);
+    margin:0;
+  }
+  a{color:var(--accent-ink);}
+  code, .ui{
+    font-family:'IBM Plex Mono','Consolas',monospace;
+    font-weight:500;
+    background:var(--surface-alt);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:.05em .4em;
+    font-size:.86em;
+    white-space:nowrap;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono','Consolas',monospace;
+    font-size:.72rem;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--accent-ink);
+    font-weight:500;
+  }
+
+  /* ---------- shell layout ---------- */
+  .shell{
+    display:grid;
+    grid-template-columns:272px minmax(0,1fr);
+    max-width:1240px;
+    margin:0 auto;
+  }
+  .sidebar{
+    position:sticky;
+    top:0;
+    align-self:start;
+    height:100vh;
+    overflow-y:auto;
+    padding:28px 18px 40px 24px;
+    border-right:1px solid var(--border);
+    scrollbar-width:thin;
+  }
+  .sidebar-brand{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    margin-bottom:22px;
+  }
+  .sidebar-brand .mark{
+    font-family:'Archivo',sans-serif;
+    font-weight:800;
+    font-size:1.15rem;
+  }
+  .sidebar-brand .tag{
+    font-size:.68rem;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .toc-group{margin-bottom:20px;}
+  .toc-group .toc-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.68rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 8px 2px;
+  }
+  .toc-group a{
+    display:block;
+    font-size:.87rem;
+    color:var(--ink);
+    text-decoration:none;
+    padding:5px 8px;
+    border-radius:6px;
+    border-left:2px solid transparent;
+    opacity:.78;
+  }
+  .toc-group a:hover{background:var(--surface-alt); opacity:1;}
+  .toc-group a.active{
+    border-left-color:var(--accent);
+    background:var(--accent-soft);
+    color:var(--accent-ink);
+    opacity:1;
+    font-weight:600;
+  }
+
+  .content{
+    padding:0 clamp(20px,4vw,56px) 96px;
+    min-width:0;
+  }
+
+  .menu-toggle{
+    display:none;
+    position:fixed;
+    top:14px; left:14px;
+    z-index:40;
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    border-radius:999px;
+    width:42px;height:42px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.75rem;
+    cursor:pointer;
+    box-shadow:var(--shadow-card);
+  }
+
+  /* ---------- cover ---------- */
+  .cover{
+    padding:64px 0 40px;
+    max-width:760px;
+  }
+  .cover .eyebrow{margin-bottom:14px;}
+  .cover h1{
+    font-size:clamp(2.1rem,4vw,2.9rem);
+    font-weight:800;
+    line-height:1.06;
+    margin-bottom:16px;
+  }
+  .cover p.lede{
+    font-size:1.05rem;
+    color:var(--muted);
+    max-width:60ch;
+    margin-bottom:28px;
+  }
+  .doc-meta{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:1px;
+    background:var(--border);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    overflow:hidden;
+    margin-bottom:36px;
+  }
+  .doc-meta div{
+    background:var(--surface);
+    padding:12px 16px;
+  }
+  .doc-meta .k{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.66rem;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:3px;
+  }
+  .doc-meta .v{font-size:.92rem; font-weight:600;}
+
+  .jump-cards{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:640px){ .jump-cards{grid-template-columns:1fr;} }
+  .jump-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:22px;
+    text-decoration:none;
+    color:var(--ink);
+    box-shadow:var(--shadow-card);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .jump-card .num{
+    font-family:'IBM Plex Mono',monospace;
+    color:var(--accent-ink);
+    font-size:.75rem;
+  }
+  .jump-card h3{font-size:1.15rem;}
+  .jump-card p{color:var(--muted); font-size:.9rem; margin:0;}
+  .jump-card .go{
+    margin-top:6px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.78rem;
+    color:var(--accent-ink);
+  }
+
+  /* ---------- part header ---------- */
+  .part-header{
+    padding:52px 0 20px;
+    border-top:2px solid var(--ink);
+    margin-top:40px;
+  }
+  .part-header .eyebrow{display:block; margin-bottom:8px;}
+  .part-header h2{font-size:clamp(1.6rem,3vw,2.1rem);}
+  .part-header p{color:var(--muted); max-width:62ch; margin-top:10px;}
+
+  section.topic{
+    padding:36px 0;
+    border-bottom:1px solid var(--border);
+    scroll-margin-top:24px;
+    max-width:72ch;
+  }
+  section.topic:last-of-type{border-bottom:none;}
+  section.topic h3{
+    font-size:1.3rem;
+    margin-bottom:6px;
+  }
+  section.topic .who{margin-bottom:14px;}
+  section.topic > p{margin:10px 0; color:var(--ink);}
+  section.topic > p.intro{color:var(--muted);}
+
+  .who-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.7rem;
+    letter-spacing:.03em;
+    padding:4px 10px 4px 8px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:var(--surface-alt);
+    color:var(--muted);
+  }
+  .who-pill.owner{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft);}
+  .who-pill.super{border-color:var(--ink); color:var(--ink); background:var(--surface-alt); font-weight:600;}
+  .who-pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  ol.steps{
+    margin:14px 0;
+    padding:0;
+    list-style:none;
+    counter-reset:step;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  ol.steps li{
+    counter-increment:step;
+    display:grid;
+    grid-template-columns:26px 1fr;
+    gap:12px;
+    align-items:start;
+  }
+  ol.steps li::before{
+    content:counter(step);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.75rem;
+    font-weight:600;
+    width:26px;height:26px;
+    border-radius:50%;
+    background:var(--ink);
+    color:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    margin-top:1px;
+  }
+  ol.steps li p{margin:0;}
+
+  ul.plain{margin:10px 0; padding-left:1.15em;}
+  ul.plain li{margin:5px 0;}
+  ul.plain li::marker{color:var(--accent-ink);}
+
+  .callout{
+    border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    background:var(--surface);
+    border-radius:var(--radius-sm);
+    padding:14px 16px;
+    margin:16px 0;
+    font-size:.92rem;
+  }
+  .callout .callout-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.68rem;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--accent-ink);
+    display:block;
+    margin-bottom:5px;
+  }
+  .callout.warn{border-left-color:var(--danger);}
+  .callout.warn .callout-label{color:var(--danger);}
+  .callout.ok{border-left-color:var(--success);}
+  .callout.ok .callout-label{color:var(--success);}
+  .callout p{margin:0;}
+  .callout p + p{margin-top:6px;}
+
+  table.fields{
+    width:100%;
+    border-collapse:collapse;
+    margin:14px 0;
+    font-size:.88rem;
+  }
+  table.fields th, table.fields td{
+    text-align:left;
+    padding:8px 10px;
+    border-bottom:1px solid var(--border);
+    vertical-align:top;
+  }
+  table.fields th{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.68rem;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:500;
+  }
+  .table-wrap{overflow-x:auto;}
+
+  .compare-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:12px;
+    margin:16px 0;
+  }
+  @media (max-width:720px){ .compare-grid{grid-template-columns:1fr;} }
+  .compare-card{
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:16px;
+    background:var(--surface);
+  }
+  .compare-card .name{font-weight:700; font-family:'Archivo',sans-serif; margin-bottom:4px;}
+  .compare-card .verdict{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:.72rem;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--border);
+  }
+  .compare-card .verdict.yes{color:var(--success);}
+  .compare-card .verdict.no{color:var(--danger);}
+
+  footer.manual-footer{
+    max-width:72ch;
+    padding:40px 0 20px;
+    color:var(--muted);
+    font-size:.85rem;
+    border-top:1px solid var(--border);
+    margin-top:40px;
+  }
+
+  @media (max-width:900px){
+    .shell{grid-template-columns:1fr;}
+    .sidebar{
+      position:fixed;
+      inset:0 auto 0 0;
+      width:78vw;
+      max-width:300px;
+      background:var(--paper);
+      transform:translateX(-100%);
+      transition:transform .22s ease;
+      z-index:35;
+      box-shadow:var(--shadow-card);
+    }
+    .sidebar.open{transform:translateX(0);}
+    .menu-toggle{display:block;}
+    .content{padding-top:70px;}
+    .cover{padding-top:20px;}
+  }
+
+  @media print{
+    .menu-toggle,.sidebar{display:none;}
+    .shell{grid-template-columns:1fr;}
+  }
+</style>
+
+<div class="shell">
+  <button class="menu-toggle" id="menuToggle" aria-label="Abrir contenido">☰</button>
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="mark">Stockia</span>
+      <span class="tag">manual</span>
+    </div>
+
+    <div class="toc-group">
+      <p class="toc-title">Inicio</p>
+      <a href="#portada">Portada</a>
+    </div>
+
+    <div class="toc-group">
+      <p class="toc-title">Parte 1 · Super administrador</p>
+      <a href="#sa-inicio">Primeros pasos</a>
+      <a href="#sa-crear-org">Crear una organización</a>
+      <a href="#sa-modulos">Activar módulos pagos</a>
+      <a href="#sa-limites">Límites del plan</a>
+      <a href="#sa-facturacion">Datos de facturación</a>
+      <a href="#sa-suspender">Suspender o reactivar</a>
+      <a href="#sa-usuarios">Usuarios de la organización</a>
+    </div>
+
+    <div class="toc-group">
+      <p class="toc-title">Parte 2 · Organización</p>
+      <a href="#org-inicio">Primeros pasos y roles</a>
+      <a href="#org-diferencia">Ventas, Facturas y Ventas por Productos</a>
+      <a href="#org-catalogo">Catálogo: categorías y productos</a>
+      <a href="#org-importar">Importar productos desde Excel</a>
+      <a href="#org-stock">Ajustar el stock</a>
+      <a href="#org-pos">Ventas por Productos</a>
+      <a href="#org-clientes">Clientes</a>
+      <a href="#org-imprimir">Imprimir la factura</a>
+      <a href="#org-ventasgastos">Ventas y Gastos</a>
+      <a href="#org-facturas">Facturas de proveedor</a>
+      <a href="#org-informes">Informes en Excel</a>
+      <a href="#org-actividad">Registro de actividad</a>
+      <a href="#org-cuenta">Mi cuenta y usuarios</a>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <section class="cover" id="portada">
+      <span class="eyebrow">Manual de uso — sin lenguaje técnico</span>
+      <h1>Cómo usar Stockia, paso a paso</h1>
+      <p class="lede">Stockia es el sistema de inventario que administra tu negocio (o los negocios de tus clientes, si eres el proveedor del software). Este manual tiene dos partes: una para quien administra la plataforma completa, y otra para quien la usa día a día dentro de un negocio.</p>
+
+      <div class="doc-meta">
+        <div><div class="k">Producto</div><div class="v">Stockia</div></div>
+        <div><div class="k">Versión del manual</div><div class="v">1.0</div></div>
+        <div><div class="k">Para</div><div class="v">Super admin y organizaciones</div></div>
+        <div><div class="k">Idioma</div><div class="v">Español</div></div>
+      </div>
+
+      <div class="jump-cards">
+        <a class="jump-card" href="#sa-inicio">
+          <span class="num">Parte 1</span>
+          <h3>Manual del Super Administrador</h3>
+          <p>Crear negocios clientes, activar sus módulos pagos, definir límites y configurar sus datos de facturación.</p>
+          <span class="go">Ir a la parte 1 →</span>
+        </a>
+        <a class="jump-card" href="#org-inicio">
+          <span class="num">Parte 2</span>
+          <h3>Manual de la Organización</h3>
+          <p>Catálogo, ventas, clientes, facturas impresas, reportes — el uso diario del negocio.</p>
+          <span class="go">Ir a la parte 2 →</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PARTE 1 — SUPER ADMINISTRADOR                                  -->
+    <!-- ============================================================ -->
+    <div class="part-header" id="parte-1">
+      <span class="eyebrow">Parte 1</span>
+      <h2>Manual del Super Administrador</h2>
+      <p>El Super Administrador es quien gestiona la plataforma completa: crea un espacio nuevo para cada negocio que compra el software, decide qué funciones tiene contratadas y configura sus datos básicos. No ve ni edita el catálogo o las ventas de esos negocios — solo los administra desde afuera.</p>
+    </div>
+
+    <section class="topic" id="sa-inicio">
+      <h3>Primeros pasos</h3>
+      <span class="who-pill super"><span class="dot"></span>Super administrador</span>
+      <p class="intro">El acceso de Super Administrador lo entrega quien instaló el sistema por primera vez. No se crea desde la pantalla de inicio de sesión.</p>
+      <ol class="steps">
+        <li><p>Entra a la dirección web del sistema e inicia sesión con tu usuario y contraseña de Super Administrador.</p></li>
+        <li><p>Verás el listado de <span class="ui">Organizaciones</span>: todos los negocios que usan el sistema, con una etiqueta de <span class="ui">Activa</span> o <span class="ui">Suspendida</span>.</p></li>
+        <li><p>Haz clic sobre cualquier organización para entrar a su configuración, o crea una nueva desde ahí mismo.</p></li>
+      </ol>
+    </section>
+
+    <section class="topic" id="sa-crear-org">
+      <h3>Crear una organización nueva</h3>
+      <span class="who-pill super"><span class="dot"></span>Super administrador</span>
+      <p class="intro">Cada vez que un negocio nuevo compra el sistema, le creas su propio espacio de trabajo, separado de todos los demás.</p>
+      <ol class="steps">
+        <li><p>Desde el listado de organizaciones, entra a <span class="ui">Nueva organización</span>.</p></li>
+        <li><p>Completa el nombre del negocio y un identificador corto (por ejemplo <code>panaderia-central</code>) que solo se usa internamente.</p></li>
+        <li><p>Define cuántos usuarios auxiliares incluye su plan (además del administrador principal).</p></li>
+        <li><p>Completa el nombre, usuario y contraseña del administrador del negocio (será quien reciba el acceso).</p></li>
+        <li><p>Guarda. El sistema crea la organización y su primer usuario administrador, listos para entregar.</p></li>
+      </ol>
+      <div class="callout">
+        <span class="callout-label">Después de crearla</span>
+        <p>Una organización nueva empieza con todos sus módulos pagos desactivados. Actívalos según lo que el negocio haya contratado (ver siguiente sección).</p>
+      </div>
+    </section>
+
+    <section class="topic" id="sa-modulos">
+      <h3>Activar los módulos pagos</h3>
+      <span class="who-pill super"><span class="dot"></span>Super administrador</span>
+      <p class="intro">El Catálogo de productos siempre está disponible. Todo lo demás es un módulo que activas o desactivas por negocio, según lo que haya contratado.</p>
+      <div class="table-wrap">
+        <table class="fields">
+          <tr><th>Módulo</th><th>Qué hace</th></tr>
+          <tr><td><strong>Ventas y Gastos</strong></td><td>Bitácora simple de ingresos y gastos diarios. No descuenta inventario.</td></tr>
+          <tr><td><strong>Facturas</strong></td><td>Archivo de recibos de compra a proveedores (guarda el PDF o la foto). Tampoco toca el inventario.</td></tr>
+          <tr><td><strong>Ventas por Productos</strong></td><td>El único módulo que descuenta el inventario automáticamente: carrito de venta, clientes, facturas imprimibles.</td></tr>
+        </table>
+      </div>
+      <ol class="steps">
+        <li><p>Entra al detalle de la organización.</p></li>
+        <li><p>En la lista de módulos, activa o desactiva cada uno con su interruptor.</p></li>
+        <li><p>El cambio aplica de inmediato: si lo desactivas, ese menú desaparece para los usuarios del negocio.</p></li>
+      </ol>
+      <div class="callout warn">
+        <span class="callout-label">Importante</span>
+        <p>Si el negocio quiere que las ventas descuenten su inventario automáticamente, el módulo que necesita es <strong>Ventas por Productos</strong>, no "Ventas y Gastos". Son cosas distintas — ver la comparación completa en la Parte 2.</p>
+      </div>
+    </section>
+
+    <section class="topic" id="sa-limites">
+      <h3>Definir los límites del plan</h3>
+      <span class="who-pill super"><span class="dot"></span>Super administrador</span>
+      <p class="intro">Cada negocio tiene topes según lo que pagó: cuántos usuarios auxiliares, cuántas categorías y cuántos productos por categoría puede tener.</p>
+      <ol class="steps">
+        <li><p>En el detalle de la organización, busca <span class="ui">Auxiliares incluidos en el plan</span>, cambia el número y confirma.</p></li>
+        <li><p>Más abajo, en <span class="ui">Límites de catálogo</span>, elige el máximo de categorías y el máximo de productos por categoría, y guarda.</p></li>
+      </ol>
+      <p>El negocio ve estos topes al intentar crear una categoría, un producto o un usuario nuevo: si ya llegó al límite, el sistema se lo avisa y no lo deja seguir hasta que hables con ellos para ampliarlo.</p>
+    </section>
+
+    <section class="topic" id="sa-facturacion">
+      <h3>Configurar los datos de facturación</h3>
+      <span class="who-pill super"><span class="dot"></span>Super administrador</span>
+      <p class="intro">Estos datos son los que aparecen impresos en cada factura de venta que el negocio le entrega a sus clientes. Vale la pena completarlos apenas la organización está activa.</p>
+      <table class="fields">
+        <tr><th>Campo</th><th>Para qué sirve</th></tr>
+        <tr><td>Razón social</td><td>Nombre legal del negocio en la factura (si lo dejas vacío, usa el nombre de la organización).</td></tr>
+        <tr><td>NIT / documento fiscal</td><td>Identificación tributaria del negocio.</td></tr>
+        <tr><td>Dirección, teléfono, correo</td><td>Datos de contacto impresos en la factura.</td></tr>
+        <tr><td>Moneda</td><td>Código de 3 letras (por ejemplo <code>COP</code>, <code>USD</code>) con el que se formatean los montos.</td></tr>
+        <tr><td>Prefijo de numeración</td><td>Texto antes del número de venta, por ejemplo <code>FAC-</code> para que la primera factura salga como <code>FAC-1</code>.</td></tr>
+        <tr><td>Pie de página</td><td>Un mensaje corto al final de la factura (política de cambios, agradecimiento, etc.).</td></tr>
+        <tr><td>Logo</td><td>Imagen que se imprime en la parte superior de la factura.</td></tr>
+      </table>
+      <ol class="steps">
+        <li><p>Entra al detalle de la organización y busca la tarjeta <span class="ui">Datos de facturación</span>.</p></li>
+        <li><p>Completa los campos y, si tienes el logo del negocio, súbelo ahí mismo.</p></li>
+        <li><p>Guarda. Los cambios se reflejan en la próxima factura que el negocio imprima.</p></li>
+      </ol>
+    </section>
+
+    <section class="topic" id="sa-suspender">
+      <h3>Suspender o reactivar el acceso</h3>
+      <span class="who-pill super"><span class="dot"></span>Super administrador</span>
+      <p class="intro">Por ejemplo, si un negocio deja de pagar su suscripción, puedes bloquearle el acceso sin borrar ninguno de sus datos.</p>
+      <ol class="steps">
+        <li><p>Entra al detalle de la organización.</p></li>
+        <li><p>Desactiva el interruptor <span class="ui">Acceso activo</span>.</p></li>
+        <li><p>Ningún usuario de ese negocio podrá volver a iniciar sesión hasta que lo reactives de la misma forma.</p></li>
+      </ol>
+      <div class="callout ok">
+        <span class="callout-label">Nada se pierde</span>
+        <p>Suspender un negocio no borra su catálogo, sus ventas ni su historial. Al reactivarlo, todo sigue exactamente donde quedó.</p>
+      </div>
+    </section>
+
+    <section class="topic" id="sa-usuarios">
+      <h3>Ver los usuarios de una organización</h3>
+      <span class="who-pill super"><span class="dot"></span>Super administrador</span>
+      <p>En el detalle de cada organización puedes ver la lista de sus usuarios (el administrador y sus auxiliares) y el rol de cada uno. Crear o eliminar usuarios auxiliares es tarea del administrador del propio negocio, no tuya — lo hace desde <span class="ui">Mi Cuenta</span> (ver Parte 2).</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PARTE 2 — ORGANIZACIÓN                                        -->
+    <!-- ============================================================ -->
+    <div class="part-header" id="parte-2">
+      <span class="eyebrow">Parte 2</span>
+      <h2>Manual de la Organización</h2>
+      <p>Esta parte es para quien usa Stockia dentro de un negocio: el administrador (dueño) y sus auxiliares. Cubre el trabajo del día a día — catálogo, ventas, clientes y reportes.</p>
+    </div>
+
+    <section class="topic" id="org-inicio">
+      <h3>Primeros pasos y roles</h3>
+      <span class="who-pill owner"><span class="dot"></span>Administrador y Auxiliar</span>
+      <p class="intro">Cada negocio tiene dos tipos de usuario. Este manual marca, en cada tema, quién puede hacer qué.</p>
+      <div class="compare-grid">
+        <div class="compare-card">
+          <div class="name">Administrador</div>
+          <p>El dueño de la cuenta. Puede hacer todo: crear y editar el catálogo, ajustar stock, anular ventas, ver reportes y el registro de actividad, y crear usuarios auxiliares.</p>
+        </div>
+        <div class="compare-card">
+          <div class="name">Auxiliar</div>
+          <p>Un empleado con acceso limitado. Puede vender, registrar movimientos y facturas de proveedor, pero no editar el catálogo, no anular ventas ni ver reportes o el registro de actividad.</p>
+        </div>
+      </div>
+      <p>Inicia sesión con el usuario y la contraseña que te entregó tu administrador (o el Super Administrador, si eres tú el dueño del negocio). El menú de la izquierda muestra solo las secciones que tu plan tiene activas; las bloqueadas aparecen con un candado.</p>
+    </section>
+
+    <section class="topic" id="org-diferencia">
+      <h3>Ventas, Facturas y Ventas por Productos: no son lo mismo</h3>
+      <span class="who-pill owner"><span class="dot"></span>Administrador y Auxiliar</span>
+      <p class="intro">Los nombres se parecen, pero cada uno sirve para algo distinto. Esta es la confusión más común al empezar a usar Stockia — léela con calma una vez y no te va a volver a pasar.</p>
+      <div class="compare-grid">
+        <div class="compare-card">
+          <div class="name">Ventas y Gastos</div>
+          <p>Una bitácora: anotas un monto de venta o de gasto con una descripción, como un cuaderno de caja.</p>
+          <div class="verdict no">✕ No descuenta inventario</div>
+        </div>
+        <div class="compare-card">
+          <div class="name">Facturas</div>
+          <p>Un archivo de comprobantes: guardas el recibo o factura que te dio un proveedor cuando le compraste.</p>
+          <div class="verdict no">✕ No descuenta inventario</div>
+        </div>
+        <div class="compare-card">
+          <div class="name">Ventas por Productos</div>
+          <p>El carrito de venta real: eliges productos, se calcula el total y el inventario baja solo.</p>
+          <div class="verdict yes">✓ Sí descuenta inventario</div>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="callout-label">En una frase</span>
+        <p>Si vendiste productos de tu catálogo y quieres que el stock se actualice y quede una factura imprimible: usa <strong>Ventas por Productos</strong>. Para cualquier otro ingreso, gasto o recibo de proveedor, usa los otros dos.</p>
+      </div>
+    </section>
+
+    <section class="topic" id="org-catalogo">
+      <h3>Catálogo: categorías y productos</h3>
+      <span class="who-pill owner"><span class="dot"></span>Solo Administrador edita</span>
+      <p class="intro">El catálogo es la base de todo lo demás: lo que no está aquí, no se puede vender desde "Ventas por Productos".</p>
+
+      <p><strong>Crear una categoría</strong></p>
+      <ol class="steps">
+        <li><p>Entra a <span class="ui">Catálogo</span> y haz clic en <span class="ui">Agregar categoría</span>.</p></li>
+        <li><p>Ponle un nombre, un ícono y un color para reconocerla rápido, y guarda.</p></li>
+      </ol>
+
+      <p><strong>Agregar un producto manualmente</strong></p>
+      <ol class="steps">
+        <li><p>Entra a la categoría correspondiente y haz clic en <span class="ui">Agregar producto</span>.</p></li>
+        <li><p>Completa nombre, cantidad inicial, precio de compra, precio de venta y, si lo tienes, el código de barras.</p></li>
+        <li><p>Guarda. El producto queda disponible de inmediato para venderse.</p></li>
+      </ol>
+      <div class="callout">
+        <span class="callout-label">Código de barras</span>
+        <p>Puedes anotarlo a mano y usarlo para buscar el producto por texto en el catálogo y en el carrito de venta. Leerlo con un lector o la cámara todavía no está disponible — llegará en una próxima versión.</p>
+      </div>
+    </section>
+
+    <section class="topic" id="org-importar">
+      <h3>Importar productos desde Excel</h3>
+      <span class="who-pill owner"><span class="dot"></span>Solo Administrador</span>
+      <p class="intro">Para cargar muchos productos de una sola vez, en lugar de uno por uno.</p>
+      <ol class="steps">
+        <li><p>Entra a <span class="ui">Catálogo</span> y haz clic en <span class="ui">Importar Excel</span>.</p></li>
+        <li><p>Haz clic en <span class="ui">Descargar plantilla</span> — trae las columnas correctas y, en otra hoja, la lista de tus categorías ya existentes.</p></li>
+        <li><p>Llena una fila por producto: Categoría, Nombre, Cantidad, Precio compra, Precio venta y, si quieres, Descripción y Código de barras.</p></li>
+        <li><p>Vuelve al sistema, selecciona tu archivo y haz clic en <span class="ui">Importar</span>.</p></li>
+      </ol>
+      <div class="callout warn">
+        <span class="callout-label">Todo o nada</span>
+        <p>Si una sola fila tiene un error (por ejemplo, una categoría que no existe, o un precio negativo), <strong>no se importa ningún producto</strong>. El sistema te muestra exactamente qué fila falló y por qué, para que la corrijas y vuelvas a intentar.</p>
+      </div>
+      <p>La categoría de cada fila debe escribirse igual a como aparece en tu catálogo (la plantilla te la recuerda). Si necesitas una categoría nueva, créala primero desde el Catálogo.</p>
+    </section>
+
+    <section class="topic" id="org-stock">
+      <h3>Ajustar el stock</h3>
+      <span class="who-pill owner"><span class="dot"></span>Solo Administrador</span>
+      <p class="intro">Para corregir la cantidad de un producto — un conteo físico, algo dañado, una compra a proveedor — sin pasar por una venta.</p>
+      <ol class="steps">
+        <li><p>En la tabla de productos, haz clic en el ícono de flechas (<span class="ui">Ajustar stock</span>) junto al producto.</p></li>
+        <li><p>Escribe cuánto sumar (por ejemplo <code>10</code>) o cuánto restar (por ejemplo <code>-3</code>).</p></li>
+        <li><p>Escribe el motivo del ajuste — es obligatorio.</p></li>
+        <li><p>Guarda. La cantidad se actualiza y queda registrado el motivo, la fecha y quién lo hizo.</p></li>
+      </ol>
+      <div class="callout">
+        <span class="callout-label">Por qué pedimos un motivo</span>
+        <p>Antes, la cantidad se podía sobrescribir editando el producto, sin dejar rastro de qué cambió ni por qué. Ahora todo ajuste manual queda anotado, igual que las ventas — así siempre puedes explicar por qué el stock está en el número que está.</p>
+      </div>
+    </section>
+
+    <section class="topic" id="org-pos">
+      <h3>Ventas por Productos</h3>
+      <span class="who-pill owner"><span class="dot"></span>Administrador y Auxiliar venden · Solo Administrador anula</span>
+      <p class="intro">El carrito de venta: aquí es donde el inventario baja de verdad.</p>
+
+      <p><strong>Armar y confirmar una venta</strong></p>
+      <ol class="steps">
+        <li><p>Entra a <span class="ui">Ventas por Productos</span> y busca cada producto por nombre o código de barras.</p></li>
+        <li><p>Haz clic sobre el producto para agregarlo al carrito; usa los botones + y − para ajustar la cantidad.</p></li>
+        <li><p>En la sección <span class="ui">Cliente</span>, elige una de las tres opciones: <span class="ui">Consumidor final</span> (venta sin datos de cliente), <span class="ui">Cliente existente</span> (buscas por nombre o documento) o <span class="ui">Cliente nuevo</span> (escribes sus datos, quedan guardados para la próxima venta).</p></li>
+        <li><p>Haz clic en <span class="ui">Confirmar venta</span>. El inventario se descuenta al instante.</p></li>
+      </ol>
+
+      <p><strong>Anular una venta</strong></p>
+      <ol class="steps">
+        <li><p>En <span class="ui">Ventas recientes</span>, ubica la venta y haz clic en el ícono de cancelar.</p></li>
+        <li><p>Confirma. El stock de esos productos regresa al inventario y la venta queda marcada como <span class="ui">Anulada</span> (no se borra, queda en el historial).</p></li>
+      </ol>
+      <div class="callout warn">
+        <span class="callout-label">Solo Administrador</span>
+        <p>Anular una venta es una acción exclusiva del Administrador. Un auxiliar puede vender, pero no deshacer una venta ya confirmada.</p>
+      </div>
+
+      <p><strong>Buscar una venta anterior</strong></p>
+      <p>Usa el buscador sobre el historial para encontrar una venta por nombre o documento del cliente, por número de factura, o por un rango de fechas — útil para reimprimirla o revisarla sin desplazarte por todo el historial.</p>
+    </section>
+
+    <section class="topic" id="org-clientes">
+      <h3>Clientes</h3>
+      <span class="who-pill owner"><span class="dot"></span>Todos ven · Solo Administrador edita o elimina</span>
+      <p class="intro">Los clientes se guardan solos la primera vez que alguien compra y elige "Cliente nuevo" al vender. También puedes gestionarlos directamente aquí.</p>
+      <ol class="steps">
+        <li><p>Entra a <span class="ui">Clientes</span> en el menú lateral.</p></li>
+        <li><p>Usa el buscador para encontrar uno por nombre, documento o teléfono.</p></li>
+        <li><p>Para agregar uno nuevo a mano, haz clic en <span class="ui">Agregar cliente</span> y completa sus datos (solo el nombre es obligatorio).</p></li>
+        <li><p>Para corregir un dato, haz clic en el lápiz junto al cliente.</p></li>
+      </ol>
+    </section>
+
+    <section class="topic" id="org-imprimir">
+      <h3>Imprimir la factura de una venta</h3>
+      <span class="who-pill owner"><span class="dot"></span>Administrador y Auxiliar</span>
+      <p class="intro">Cada venta registrada desde "Ventas por Productos" tiene su propia factura lista para imprimir, con el formato de un tique de impresora térmica.</p>
+      <ol class="steps">
+        <li><p>En el historial de ventas, haz clic en el ícono de impresora junto a la venta.</p></li>
+        <li><p>Se abre la vista de la factura, con los datos de tu negocio (los que configuró el Super Administrador), los del cliente si los hay, y el detalle de productos.</p></li>
+        <li><p>Elige el ancho de tu rollo de papel, <span class="ui">58mm</span> u <span class="ui">80mm</span>, arriba de la factura.</p></li>
+        <li><p>Haz clic en <span class="ui">Imprimir</span>: se abre el cuadro de impresión de tu navegador. Ahí puedes imprimir en papel o elegir "Guardar como PDF".</p></li>
+      </ol>
+    </section>
+
+    <section class="topic" id="org-ventasgastos">
+      <h3>Ventas y Gastos</h3>
+      <span class="who-pill owner"><span class="dot"></span>Todos registran · Solo Administrador edita o elimina</span>
+      <p class="intro">Una bitácora simple para llevar el control de caja del día, sin relación con el inventario.</p>
+      <ol class="steps">
+        <li><p>Entra a <span class="ui">Ventas y Gastos</span> y elige si vas a registrar una <span class="ui">Venta</span> o un <span class="ui">Gasto</span>.</p></li>
+        <li><p>Escribe el monto, una descripción y la fecha; si quieres, adjunta una foto o un archivo del comprobante.</p></li>
+        <li><p>Guarda. Verás el total de ventas, de gastos y el balance del período.</p></li>
+      </ol>
+    </section>
+
+    <section class="topic" id="org-facturas">
+      <h3>Facturas de proveedor</h3>
+      <span class="who-pill owner"><span class="dot"></span>Todos registran · Solo Administrador edita o elimina</span>
+      <p class="intro">Aquí guardas los comprobantes que te dan tus proveedores cuando les compras a ti — no es lo mismo que la factura que tú le entregas a un cliente (esa está en Ventas por Productos).</p>
+      <ol class="steps">
+        <li><p>Entra a <span class="ui">Facturas</span> y registra el proveedor, el número de factura, el monto y la fecha.</p></li>
+        <li><p>Adjunta el archivo (PDF o foto) si lo tienes.</p></li>
+        <li><p>Guarda. Queda archivada para consultarla cuando la necesites.</p></li>
+      </ol>
+    </section>
+
+    <section class="topic" id="org-informes">
+      <h3>Informes en Excel</h3>
+      <span class="who-pill owner"><span class="dot"></span>Solo Administrador</span>
+      <p class="intro">Tres reportes descargables, cada uno del tema correspondiente.</p>
+      <table class="fields">
+        <tr><th>Reporte</th><th>Trae</th></tr>
+        <tr><td>Inventario</td><td>Todos tus productos, cantidad, precios, código de barras y una marca de "stock bajo".</td></tr>
+        <tr><td>Ventas y Gastos</td><td>El detalle de la bitácora manual, con totales, filtrable por fecha.</td></tr>
+        <tr><td>Ventas por Productos</td><td>Cada venta del carrito con su cliente, productos y total, filtrable por fecha.</td></tr>
+      </table>
+      <p>Entra a <span class="ui">Informes</span>, elige el rango de fechas si aplica, y haz clic en <span class="ui">Exportar a Excel</span>. Sin fechas, descarga todo el historial disponible.</p>
+    </section>
+
+    <section class="topic" id="org-actividad">
+      <h3>Registro de actividad</h3>
+      <span class="who-pill owner"><span class="dot"></span>Solo Administrador</span>
+      <p>Un historial de las últimas acciones de todos los usuarios del negocio: quién creó o editó un producto, quién ajustó stock, quién registró una venta. Útil para saber qué pasó y quién lo hizo, sin tener que preguntar.</p>
+    </section>
+
+    <section class="topic" id="org-cuenta">
+      <h3>Mi Cuenta y usuarios auxiliares</h3>
+      <span class="who-pill owner"><span class="dot"></span>Cambiar contraseña: todos · Crear auxiliares: solo Administrador</span>
+      <p class="intro">Desde aquí cada usuario cambia su propia contraseña, y el Administrador crea los accesos de su equipo.</p>
+      <ol class="steps">
+        <li><p>Entra a <span class="ui">Mi Cuenta</span>.</p></li>
+        <li><p>Para cambiar tu contraseña, escribe la nueva dos veces y guarda.</p></li>
+        <li><p>Si eres Administrador, en <span class="ui">Crear auxiliar</span> escribe el nombre, el usuario y una contraseña inicial para tu nuevo empleado — hasta el máximo de auxiliares que incluya tu plan.</p></li>
+      </ol>
+      <p>Para ver qué módulos tienes activos o bloqueados, entra a <span class="ui">Módulos</span> en el menú lateral. Si necesitas activar uno nuevo, contacta a tu proveedor del software.</p>
+    </section>
+
+    <footer class="manual-footer">
+      <p>Stockia — software de inventario multi-negocio, desarrollado por NOVA STUDIO.</p>
+      <p>Este manual describe el funcionamiento del sistema tal como está disponible hoy; algunas funciones (como la lectura de código de barras) están planeadas para versiones futuras.</p>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  (function(){
+    var toggle = document.getElementById('menuToggle');
+    var sidebar = document.getElementById('sidebar');
+    if(toggle && sidebar){
+      toggle.addEventListener('click', function(){
+        sidebar.classList.toggle('open');
+      });
+      sidebar.querySelectorAll('a').forEach(function(a){
+        a.addEventListener('click', function(){ sidebar.classList.remove('open'); });
+      });
+    }
+
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc-group a'));
+    var sections = links
+      .map(function(a){ return document.querySelector(a.getAttribute('href')); })
+      .filter(Boolean);
+
+    if('IntersectionObserver' in window && sections.length){
+      var byId = {};
+      links.forEach(function(a){ byId[a.getAttribute('href').slice(1)] = a; });
+
+      var observer = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          var link = byId[entry.target.id];
+          if(!link) return;
+          if(entry.isIntersecting){
+            links.forEach(function(a){ a.classList.remove('active'); });
+            link.classList.add('active');
+          }
+        });
+      }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+
+      sections.forEach(function(s){ observer.observe(s); });
+    }
+  })();
+</script>

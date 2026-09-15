@@ -2,10 +2,12 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CategoryCard } from "@/components/catalogo/category-card";
 import { AddCategoryButton } from "@/components/catalogo/add-category-button";
+import { ImportProductsButton } from "@/components/catalogo/import-products-button";
 import type { Category } from "@/lib/supabase/types";
 
 export default async function CatalogoPage() {
   const profile = await requireProfile();
+  if (!profile.organization_id) return null;
   const supabase = await createClient();
 
   const { data: categories } = await supabase
@@ -36,7 +38,12 @@ export default async function CatalogoPage() {
             Organiza tus productos por categorías.
           </p>
         </div>
-        {canEdit && <AddCategoryButton />}
+        {canEdit && (
+          <div className="flex gap-2">
+            <ImportProductsButton />
+            <AddCategoryButton />
+          </div>
+        )}
       </div>
 
       {list.length === 0 ? (

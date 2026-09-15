@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProductFormDialog } from "@/components/catalogo/product-form-dialog";
+import { StockAdjustDialog } from "@/components/catalogo/stock-adjust-dialog";
 import { createProduct, updateProduct, deleteProduct } from "@/lib/actions/catalogo";
 import type { Product } from "@/lib/supabase/types";
 
@@ -31,11 +32,15 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
   const [search, setSearch] = React.useState("");
   const [addOpen, setAddOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Product | null>(null);
+  const [adjusting, setAdjusting] = React.useState<Product | null>(null);
   const [deleting, setDeleting] = React.useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
-  const filtered = products.filter((product) =>
-    product.name.toLowerCase().includes(search.toLowerCase())
+  const term = search.toLowerCase();
+  const filtered = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(term) ||
+      (product.barcode ?? "").toLowerCase().includes(term)
   );
 
   const boundCreate = createProduct.bind(null, categoryId);
@@ -56,7 +61,7 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
           <Input
-            placeholder="Buscar producto..."
+            placeholder="Buscar producto o código de barras..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="pl-9"
@@ -92,7 +97,12 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
             )}
             {filtered.map((product) => (
               <tr key={product.id} className="border-b border-brand-border last:border-0">
-                <td className="p-3 font-medium text-brand-ink">{product.name}</td>
+                <td className="p-3 font-medium text-brand-ink">
+                  {product.name}
+                  {product.barcode && (
+                    <p className="text-xs font-normal text-brand-muted">Cód: {product.barcode}</p>
+                  )}
+                </td>
                 <td className="p-3">
                   <div className="flex items-center gap-2">
                     {product.quantity}
@@ -107,6 +117,14 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
                 {canEdit && (
                   <td className="p-3">
                     <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setAdjusting(product)}
+                        aria-label="Ajustar stock"
+                      >
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditing(product)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -134,6 +152,13 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
               action={boundUpdate}
             />
           )}
+
+          <StockAdjustDialog
+            open={!!adjusting}
+            onOpenChange={(open) => !open && setAdjusting(null)}
+            product={adjusting}
+            categoryId={categoryId}
+          />
 
           <ConfirmDialog
             open={!!deleting}

@@ -10,6 +10,17 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default async function ActividadPage() {
   const profile = await requireRole("owner", "super_admin");
+  // El registro de actividad es por organización; un super_admin no tiene
+  // una propia (ve todo el sistema desde /superadmin), así que aquí no hay
+  // nada que mostrarle.
+  if (!profile.organization_id) {
+    return (
+      <p className="text-sm text-brand-muted">
+        El registro de actividad es por organización. Entra a Super Admin para revisar la
+        actividad de una organización específica.
+      </p>
+    );
+  }
   const supabase = await createClient();
 
   const { data: entries } = await supabase

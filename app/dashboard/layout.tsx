@@ -50,6 +50,12 @@ export default async function DashboardLayout({
       icon: "ventasProductos",
       locked: !isModuleEnabled(MODULE_KEYS.VENTAS_PRODUCTOS),
     });
+    items.push({
+      href: "/dashboard/clientes",
+      label: "Clientes",
+      icon: "clientes",
+      locked: !isModuleEnabled(MODULE_KEYS.VENTAS_PRODUCTOS),
+    });
 
     if (profile.role === "owner") {
       items.push({

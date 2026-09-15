@@ -7,6 +7,7 @@ import { getModulesWithStatus } from "@/lib/modules";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModuleToggleList } from "@/components/superadmin/module-toggle-list";
 import { OrganizationSettings } from "@/components/superadmin/organization-settings";
+import { InvoiceSettings } from "@/components/superadmin/invoice-settings";
 import type { Organization, Profile } from "@/lib/supabase/types";
 
 export default async function OrganizationDetailPage({
@@ -52,6 +53,7 @@ export default async function OrganizationDetailPage({
       </div>
 
       <OrganizationSettings organization={org} />
+      <InvoiceSettings organization={org} />
       <ModuleToggleList organizationId={org.id} modules={modules} />
 
       <Card>

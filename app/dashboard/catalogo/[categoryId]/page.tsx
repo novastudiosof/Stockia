@@ -14,6 +14,7 @@ export default async function CategoryDetailPage({
 }) {
   const { categoryId } = await params;
   const profile = await requireProfile();
+  if (!profile.organization_id) notFound();
   const supabase = await createClient();
 
   const { data: category } = await supabase

@@ -36,6 +36,7 @@ export async function GET() {
   sheet.columns = [
     { header: "Categoría", key: "categoria", width: 24 },
     { header: "Producto", key: "producto", width: 30 },
+    { header: "Código de barras", key: "codigoBarras", width: 20 },
     { header: "Cantidad", key: "cantidad", width: 12 },
     { header: "Precio compra", key: "compra", width: 16 },
     { header: "Precio venta", key: "venta", width: 16 },
@@ -47,6 +48,7 @@ export async function GET() {
     const row = sheet.addRow({
       categoria: categoryById.get(p.category_id) || "—",
       producto: p.name,
+      codigoBarras: p.barcode || "",
       cantidad: p.quantity,
       compra: Number(p.purchase_price),
       venta: Number(p.sale_price),

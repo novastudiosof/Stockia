@@ -7,7 +7,13 @@ import { requireRole } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createOrganizationSchema } from "@/lib/validations/superadmin";
+import { friendlyDbError } from "@/lib/db-errors";
+import {
+  createOrganizationSchema,
+  invoiceSettingsSchema,
+  ALLOWED_LOGO_MIME_TYPES,
+  MAX_LOGO_FILE_SIZE_MB,
+} from "@/lib/validations/superadmin";
 
 type ActionResult = { error?: string } | void;
 
@@ -40,7 +46,13 @@ export async function createOrganization(
     .single();
 
   if (orgError || !org) {
-    return { error: "No se pudo crear la organización (verifica que el slug sea único)" };
+    return {
+      error: friendlyDbError(
+        orgError,
+        "createOrganization:org",
+        "No se pudo crear la organización (verifica que el slug sea único)"
+      ),
+    };
   }
 
   const authEmail = `${crypto.randomUUID()}@inventario.internal`;
@@ -52,7 +64,9 @@ export async function createOrganization(
 
   if (createError || !created.user) {
     await admin.from("organizations").delete().eq("id", org.id);
-    return { error: "No se pudo crear el usuario del administrador" };
+    return {
+      error: friendlyDbError(createError, "createOrganization:authUser", "No se pudo crear el usuario del administrador"),
+    };
   }
 
   const { error: profileError } = await admin.from("profiles").insert({
@@ -96,7 +110,7 @@ export async function toggleModule(
     enabled,
     enabled_at: enabled ? new Date().toISOString() : null,
   });
-  if (error) return { error: "No se pudo actualizar el módulo" };
+  if (error) return { error: friendlyDbError(error, "toggleModule", "No se pudo actualizar el módulo") };
 
   await logActivity(profile, enabled ? "Activó módulo" : "Desactivó módulo", moduleId);
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);
@@ -111,7 +125,7 @@ export async function updateMaxAuxiliares(organizationId: string, maxAuxiliares:
     .from("organizations")
     .update({ max_auxiliares: maxAuxiliares })
     .eq("id", organizationId);
-  if (error) return { error: "No se pudo actualizar el límite de auxiliares" };
+  if (error) return { error: friendlyDbError(error, "updateMaxAuxiliares", "No se pudo actualizar el límite de auxiliares") };
 
   await logActivity(profile, "Actualizó límite de auxiliares", String(maxAuxiliares));
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);
@@ -132,13 +146,71 @@ export async function updateOrganizationLimits(
       max_productos_por_categoria: maxProductosPorCategoria,
     })
     .eq("id", organizationId);
-  if (error) return { error: "No se pudo actualizar los límites de catálogo" };
+  if (error) return { error: friendlyDbError(error, "updateOrganizationLimits", "No se pudo actualizar los límites de catálogo") };
 
   await logActivity(
     profile,
     "Actualizó límites de catálogo",
     `${maxCategorias} categorías, ${maxProductosPorCategoria} productos c/u`
   );
+  revalidatePath(`/superadmin/organizaciones/${organizationId}`);
+}
+
+export async function updateInvoiceSettings(
+  organizationId: string,
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await requireRole("super_admin");
+
+  const parsed = invoiceSettingsSchema.safeParse({
+    legalName: formData.get("legalName") ?? "",
+    taxId: formData.get("taxId") ?? "",
+    billingAddress: formData.get("billingAddress") ?? "",
+    billingPhone: formData.get("billingPhone") ?? "",
+    billingEmail: formData.get("billingEmail") ?? "",
+    invoiceFooter: formData.get("invoiceFooter") ?? "",
+    currency: formData.get("currency") || "COP",
+    invoicePrefix: formData.get("invoicePrefix") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const supabase = await createClient();
+
+  const file = formData.get("logo") as File | null;
+  let logoUrl: string | undefined;
+  if (file && file.size > 0) {
+    if (!ALLOWED_LOGO_MIME_TYPES.includes(file.type)) {
+      return { error: "El logo debe ser una imagen (PNG, JPG o WEBP)" };
+    }
+    if (file.size > MAX_LOGO_FILE_SIZE_MB * 1024 * 1024) {
+      return { error: `El logo no puede superar ${MAX_LOGO_FILE_SIZE_MB}MB` };
+    }
+    const path = `${organizationId}/logo-${crypto.randomUUID()}`;
+    const { error: uploadError } = await supabase.storage
+      .from("branding")
+      .upload(path, file, { contentType: file.type, upsert: true });
+    if (uploadError) return { error: friendlyDbError(uploadError, "updateInvoiceSettings:upload", "No se pudo subir el logo") };
+    logoUrl = supabase.storage.from("branding").getPublicUrl(path).data.publicUrl;
+  }
+
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      legal_name: parsed.data.legalName || null,
+      tax_id: parsed.data.taxId || null,
+      billing_address: parsed.data.billingAddress || null,
+      billing_phone: parsed.data.billingPhone || null,
+      billing_email: parsed.data.billingEmail || null,
+      invoice_footer: parsed.data.invoiceFooter || null,
+      currency: parsed.data.currency,
+      invoice_prefix: parsed.data.invoicePrefix || "",
+      ...(logoUrl ? { logo_url: logoUrl } : {}),
+    })
+    .eq("id", organizationId);
+  if (error) return { error: friendlyDbError(error, "updateInvoiceSettings", "No se pudo actualizar la información de facturación") };
+
+  await logActivity(profile, "Actualizó datos de facturación", organizationId);
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);
 }
 
@@ -150,7 +222,7 @@ export async function toggleOrganizationActive(organizationId: string, isActive:
     .from("organizations")
     .update({ is_active: isActive })
     .eq("id", organizationId);
-  if (error) return { error: "No se pudo actualizar el estado de la organización" };
+  if (error) return { error: friendlyDbError(error, "toggleOrganizationActive", "No se pudo actualizar el estado de la organización") };
 
   await logActivity(profile, isActive ? "Reactivó organización" : "Suspendió organización");
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);

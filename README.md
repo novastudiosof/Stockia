@@ -14,7 +14,10 @@ panel de super administrador.
 3. Copia `.env.example` a `.env.local` y completa esos valores.
 4. En el **SQL Editor** de Supabase, ejecuta en orden los archivos de `sql/`:
    `001_schema.sql`, `002_rls_policies.sql`, `003_seed_modules.sql`,
-   `004_storage.sql`.
+   `004_storage.sql`, `005_permisos_limites_pos.sql`, `006_anular_venta.sql`,
+   `007_clientes.sql`, `008_stock_movements.sql`,
+   `009_facturacion_organizacion.sql`, `010_producto_barcode.sql`,
+   `011_bulk_import_productos.sql`, `012_correcciones.sql`.
 
 ## 2. Crear el primer super administrador
 

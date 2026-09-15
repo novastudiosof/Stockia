@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
+import { friendlyDbError } from "@/lib/db-errors";
 import {
   ALLOWED_INVOICE_MIME_TYPES,
   MAX_INVOICE_FILE_SIZE_MB,
@@ -55,7 +56,7 @@ export async function createInvoice(
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(filePath, file, { contentType: file.type });
-    if (uploadError) return { error: "No se pudo subir el archivo" };
+    if (uploadError) return { error: friendlyDbError(uploadError, "createInvoice:upload", "No se pudo subir el archivo") };
   }
 
   const { error } = await supabase.from("invoices").insert({
@@ -67,7 +68,7 @@ export async function createInvoice(
     file_path: filePath,
     created_by: profile.id,
   });
-  if (error) return { error: "No se pudo registrar la factura" };
+  if (error) return { error: friendlyDbError(error, "createInvoice", "No se pudo registrar la factura") };
 
   await logActivity(profile, "Registró factura", parsed.data.provider);
   revalidatePath("/dashboard/facturas");
@@ -104,7 +105,7 @@ export async function updateInvoice(
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(filePath, file, { contentType: file.type });
-    if (uploadError) return { error: "No se pudo subir el archivo" };
+    if (uploadError) return { error: friendlyDbError(uploadError, "updateInvoice:upload", "No se pudo subir el archivo") };
 
     if (currentFilePath) {
       await supabase.storage.from(BUCKET).remove([currentFilePath]);
@@ -121,7 +122,7 @@ export async function updateInvoice(
       file_path: filePath,
     })
     .eq("id", invoiceId);
-  if (error) return { error: "No se pudo actualizar la factura" };
+  if (error) return { error: friendlyDbError(error, "updateInvoice", "No se pudo actualizar la factura") };
 
   await logActivity(profile, "Editó factura", parsed.data.provider);
   revalidatePath("/dashboard/facturas");
@@ -140,7 +141,7 @@ export async function deleteInvoice(invoiceId: string, filePath: string | null, 
   }
 
   const { error } = await supabase.from("invoices").delete().eq("id", invoiceId);
-  if (error) return { error: "No se pudo eliminar la factura" };
+  if (error) return { error: friendlyDbError(error, "deleteInvoice", "No se pudo eliminar la factura") };
 
   await logActivity(profile, "Eliminó factura", provider);
   revalidatePath("/dashboard/facturas");

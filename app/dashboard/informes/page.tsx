@@ -1,12 +1,14 @@
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { VentasReportCard } from "@/components/informes/ventas-report-card";
+import { VentasProductosReportCard } from "@/components/informes/ventas-productos-report-card";
 import { InventarioReportCard } from "@/components/informes/inventario-report-card";
 
 const LOW_STOCK_THRESHOLD = 10;
 
 export default async function InformesPage() {
   const profile = await requireRole("owner");
+  if (!profile.organization_id) return null;
 
   const supabase = await createClient();
   const { data: products } = await supabase
@@ -29,6 +31,7 @@ export default async function InformesPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <VentasReportCard />
+        <VentasProductosReportCard />
         <InventarioReportCard
           totalProductos={totalProductos}
           productosStockBajo={productosStockBajo}

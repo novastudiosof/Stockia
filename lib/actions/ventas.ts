@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
+import { friendlyDbError } from "@/lib/db-errors";
 import { movementSchema } from "@/lib/validations/ventas";
 import { ALLOWED_INVOICE_MIME_TYPES, MAX_INVOICE_FILE_SIZE_MB } from "@/lib/validations/facturas";
 
@@ -52,7 +53,7 @@ export async function createMovement(
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(filePath, file, { contentType: file.type });
-    if (uploadError) return { error: "No se pudo subir el archivo" };
+    if (uploadError) return { error: friendlyDbError(uploadError, "createMovement:upload", "No se pudo subir el archivo") };
   }
 
   const { error } = await supabase.from("movements").insert({
@@ -64,7 +65,7 @@ export async function createMovement(
     file_path: filePath,
     created_by: profile.id,
   });
-  if (error) return { error: "No se pudo registrar el movimiento" };
+  if (error) return { error: friendlyDbError(error, "createMovement", "No se pudo registrar el movimiento") };
 
   await logActivity(
     profile,
@@ -102,7 +103,7 @@ export async function updateMovement(
       occurred_at: parsed.data.occurredAt,
     })
     .eq("id", movementId);
-  if (error) return { error: "No se pudo actualizar el movimiento" };
+  if (error) return { error: friendlyDbError(error, "updateMovement", "No se pudo actualizar el movimiento") };
 
   await logActivity(profile, "Editó movimiento", parsed.data.description || undefined);
   revalidatePath("/dashboard/ventas");
@@ -116,7 +117,7 @@ export async function deleteMovement(movementId: string) {
 
   const supabase = await createClient();
   const { error } = await supabase.from("movements").delete().eq("id", movementId);
-  if (error) return { error: "No se pudo eliminar el movimiento" };
+  if (error) return { error: friendlyDbError(error, "deleteMovement", "No se pudo eliminar el movimiento") };
 
   await logActivity(profile, "Eliminó movimiento");
   revalidatePath("/dashboard/ventas");

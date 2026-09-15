@@ -51,18 +51,12 @@ export function ProductFormDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="quantity">Cantidad</Label>
-              <Input
-                id="quantity"
-                name="quantity"
-                type="number"
-                min={0}
-                defaultValue={product?.quantity ?? 0}
-                required
-              />
-            </div>
-            <div />
+            {!product && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="quantity">Cantidad inicial</Label>
+                <Input id="quantity" name="quantity" type="number" min={0} defaultValue={0} required />
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="purchasePrice">Precio de compra</Label>
               <Input
@@ -87,7 +81,18 @@ export function ProductFormDialog({
                 required
               />
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="barcode">Código de barras</Label>
+              <Input id="barcode" name="barcode" defaultValue={product?.barcode ?? ""} />
+            </div>
           </div>
+
+          {product && (
+            <p className="text-xs text-brand-muted">
+              Para cambiar la cantidad en stock usa &quot;Ajustar stock&quot; en la tabla — así
+              queda registrado el motivo del cambio.
+            </p>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="description">Descripción</Label>

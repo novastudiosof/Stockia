@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   User,
+  Users,
   X,
 } from "lucide-react";
 
@@ -33,7 +34,8 @@ export interface SidebarNavItem {
     | "cuenta"
     | "superadmin"
     | "ventasProductos"
-    | "informes";
+    | "informes"
+    | "clientes";
   locked?: boolean;
 }
 
@@ -47,6 +49,7 @@ const ICONS = {
   superadmin: ShieldCheck,
   ventasProductos: ShoppingCart,
   informes: BarChart3,
+  clientes: Users,
 };
 
 interface SidebarProps {
