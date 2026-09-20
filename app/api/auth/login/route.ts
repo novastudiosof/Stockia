@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const { username, password } = parsed.data;
 
   const admin = createAdminClient();
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
     .select("auth_email, organization_id")
     .eq("username", username)
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   if (!profile) {
     return NextResponse.json(
-      { error: "Usuario o contraseña incorrectos" },
+      { error: "Usuario o contraseña incorrectos", debug: "profile_not_found", profileError },
       { status: 401 }
     );
   }
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json(
-      { error: "Usuario o contraseña incorrectos" },
+      { error: "Usuario o contraseña incorrectos", debug: "signin_failed", signinError: error.message },
       { status: 401 }
     );
   }
