@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModuleToggleList } from "@/components/superadmin/module-toggle-list";
 import { OrganizationSettings } from "@/components/superadmin/organization-settings";
 import { InvoiceSettings } from "@/components/superadmin/invoice-settings";
+import { DeleteOrganization } from "@/components/superadmin/delete-organization";
 import type { Organization, Profile } from "@/lib/supabase/types";
 
 export default async function OrganizationDetailPage({
@@ -77,6 +78,8 @@ export default async function OrganizationDetailPage({
           ))}
         </CardContent>
       </Card>
+
+      <DeleteOrganization organizationId={org.id} organizationName={org.name} />
     </div>
   );
 }

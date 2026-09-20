@@ -214,6 +214,37 @@ export async function updateInvoiceSettings(
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);
 }
 
+export async function deleteOrganization(organizationId: string): Promise<ActionResult> {
+  const profile = await requireRole("super_admin");
+  const admin = createAdminClient();
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .single();
+
+  const { data: users } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", organizationId);
+
+  const { error } = await admin.from("organizations").delete().eq("id", organizationId);
+  if (error) {
+    return {
+      error: friendlyDbError(error, "deleteOrganization", "No se pudo eliminar la organización"),
+    };
+  }
+
+  for (const user of users ?? []) {
+    await admin.auth.admin.deleteUser(user.id);
+  }
+
+  await logActivity(profile, "Eliminó organización", org?.name ?? organizationId);
+  revalidatePath("/superadmin");
+  redirect("/superadmin");
+}
+
 export async function toggleOrganizationActive(organizationId: string, isActive: boolean) {
   const profile = await requireRole("super_admin");
   const supabase = await createClient();
