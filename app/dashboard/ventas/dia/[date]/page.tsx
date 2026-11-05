@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { paymentLabel } from "@/lib/payments";
+import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -163,7 +164,8 @@ export default async function DetalleDiaPage({
                   )}
                 </td>
                 <td data-label="" className="p-3">
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <DownloadInvoiceButton saleId={sale.id} display="icon" />
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/dashboard/ventas-productos/${sale.id}/factura`} target="_blank">
                         <Printer className="h-4 w-4" />

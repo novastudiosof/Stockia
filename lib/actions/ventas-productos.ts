@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { friendlyDbError } from "@/lib/db-errors";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import { saleInputSchema } from "@/lib/validations/ventas-productos";
-import type { PaymentInput, Sale } from "@/lib/supabase/types";
+import type { Organization, PaymentInput, Sale } from "@/lib/supabase/types";
 
 type ActionResult = {
   error?: string;
@@ -132,4 +132,31 @@ export async function searchSales(filters: SaleSearchFilters): Promise<SaleSearc
     return { results: [], error: friendlyDbError(error, "searchSales", "No se pudo buscar") };
   }
   return { results: data ?? [] };
+}
+
+export interface InvoiceTicketResult {
+  error?: string;
+  sale?: Sale;
+  organization?: Organization;
+}
+
+/** Datos para armar el PDF de una factura de venta (se genera en el navegador). */
+export async function getInvoiceTicket(saleId: string): Promise<InvoiceTicketResult> {
+  const profile = await requireProfile();
+  if (!profile.organization_id) return { error: "Sin organización asociada" };
+  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+
+  const supabase = await createClient();
+  const [{ data: sale }, { data: organization }] = await Promise.all([
+    supabase
+      .from("sales")
+      .select("*")
+      .eq("id", saleId)
+      .eq("organization_id", profile.organization_id)
+      .single(),
+    supabase.from("organizations").select("*").eq("id", profile.organization_id).single(),
+  ]);
+
+  if (!sale || !organization) return { error: "No se encontró la factura" };
+  return { sale: sale as Sale, organization: organization as Organization };
 }

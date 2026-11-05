@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Stockia",
   description: "Stockia — control de inventario, ventas, gastos y facturas para tu negocio.",
-  icons: { icon: "/brand/logo.svg" },
+  icons: { icon: "/brand/logo-icon.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

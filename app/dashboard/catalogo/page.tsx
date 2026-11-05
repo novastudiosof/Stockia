@@ -46,7 +46,7 @@ export default async function CatalogoPage() {
       {list.length > 0 && <ProductSearch />}
 
       {list.length === 0 ? (
-        <div className="rounded-[var(--radius-brand-md)] border border-dashed border-brand-border bg-white p-10 text-center text-brand-muted">
+        <div className="empty-glow rounded-[var(--radius-brand-md)] p-10 text-center text-brand-muted">
           Aún no tienes categorías. Crea la primera para empezar a cargar productos.
         </div>
       ) : (

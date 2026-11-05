@@ -94,7 +94,10 @@ export default async function DashboardLayout({
   items.push({ href: "/dashboard/cuenta", label: "Mi Cuenta", icon: "cuenta" });
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen">
+      <div className="app-aurora" aria-hidden="true">
+        <div className="app-aurora-grid" />
+      </div>
       <Sidebar
         fullName={profile.full_name}
         roleLabel={ROLE_LABELS[profile.role] ?? profile.role}

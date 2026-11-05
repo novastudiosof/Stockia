@@ -47,10 +47,21 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-brand-ink px-4">
-      <div className="w-full max-w-sm rounded-[var(--radius-brand-lg)] bg-white p-8 shadow-lg">
+    <main className="login-bg relative flex min-h-screen items-center justify-center px-4">
+      <div className="orb orb-violet -left-20 top-10 h-80 w-80" aria-hidden="true" />
+      <div className="orb orb-cyan -right-24 bottom-0 h-96 w-96" aria-hidden="true" />
+      <div className="login-card animate-rise relative z-10 w-full max-w-sm rounded-[var(--radius-brand-lg)] p-8 shadow-2xl">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Image src="/brand/logo.svg" alt="Logo" width={72} height={72} priority />
+          <div className="animate-float rounded-2xl">
+            <Image
+              src="/brand/logo-icon.png"
+              alt="Logo"
+              width={72}
+              height={72}
+              priority
+              className="animate-glow rounded-2xl"
+            />
+          </div>
           <div>
             <h1 className="text-xl font-semibold text-brand-ink">Stockia</h1>
             <p className="text-sm text-brand-muted">Inicia sesión para continuar</p>
@@ -104,7 +115,7 @@ export default function LoginPage() {
           </Button>
         </form>
       </div>
-      <div className="absolute inset-x-0 bottom-0">
+      <div className="absolute inset-x-0 bottom-0 z-10">
         <BrandFooter className="text-white/50 [&_a]:text-white/80" />
       </div>
     </main>

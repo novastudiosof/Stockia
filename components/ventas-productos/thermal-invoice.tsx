@@ -4,6 +4,7 @@ import * as React from "react";
 import { Printer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
 import type { CustomerSnapshot, Organization, SaleItem } from "@/lib/supabase/types";
 
 type Width = "58" | "80";
@@ -18,6 +19,7 @@ interface ThermalInvoiceProps {
   organization: Organization;
   soldBy?: string | null;
   paymentText?: string | null;
+  saleId?: string;
 }
 
 export function ThermalInvoice({
@@ -30,6 +32,7 @@ export function ThermalInvoice({
   organization,
   soldBy,
   paymentText,
+  saleId,
 }: ThermalInvoiceProps) {
   const [width, setWidth] = React.useState<Width>("80");
 
@@ -78,10 +81,15 @@ export function ThermalInvoice({
             </button>
           ))}
         </div>
-        <Button onClick={() => window.print()}>
-          <Printer className="h-4 w-4" />
-          Imprimir
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {saleId && (
+            <DownloadInvoiceButton saleId={saleId} widthMm={width === "58" ? 58 : 80} />
+          )}
+          <Button onClick={() => window.print()}>
+            <Printer className="h-4 w-4" />
+            Imprimir
+          </Button>
+        </div>
       </div>
 
       <div

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Search, ShoppingCart, Trash2, User } from "lucide-react";
 
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createSale } from "@/lib/actions/ventas-productos";
+import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
 import { searchClientes } from "@/lib/actions/clientes";
 import type { Cliente, PaymentInput, Product, TransferChannel } from "@/lib/supabase/types";
 
@@ -57,6 +59,7 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
+  const [lastSaleId, setLastSaleId] = React.useState<string | null>(null);
 
   const [customerMode, setCustomerMode] = React.useState<CustomerMode>("none");
   const [customerQuery, setCustomerQuery] = React.useState("");
@@ -114,6 +117,7 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
   function addToCart(product: Product) {
     setError(null);
     setSuccess(null);
+    setLastSaleId(null);
     setCart((prev) => {
       const existing = prev[product.id];
       const nextQty = (existing?.quantity ?? 0) + 1;
@@ -203,6 +207,7 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
     }
 
     setSuccess(`Venta registrada por ${currency.format(result.total ?? 0)}`);
+    setLastSaleId(result.saleId ?? null);
     setCart({});
     setCustomerEmail("");
     setPayMethod("efectivo");
@@ -505,6 +510,16 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
 
             {error && <p className="text-sm text-brand-danger">{error}</p>}
             {success && <p className="text-sm text-brand-success">{success}</p>}
+            {success && lastSaleId && (
+              <div className="flex flex-wrap items-center gap-2">
+                <DownloadInvoiceButton saleId={lastSaleId} size="sm" />
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/dashboard/ventas-productos/${lastSaleId}/factura`} target="_blank">
+                    Ver factura
+                  </Link>
+                </Button>
+              </div>
+            )}
 
             <Button disabled={lines.length === 0 || submitting} onClick={handleConfirm}>
               {submitting ? "Registrando..." : "Confirmar venta"}

@@ -46,6 +46,7 @@ export default async function FacturaVentaPage({
 
   return (
     <ThermalInvoice
+      saleId={saleRow.id}
       invoiceNumber={invoiceNumber}
       dateLabel={dateTime.format(new Date(saleRow.created_at))}
       voided={Boolean(saleRow.voided_at)}
