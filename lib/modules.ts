@@ -8,6 +8,9 @@ export const MODULE_KEYS = {
   VENTAS_GASTOS: "ventas_gastos",
   FACTURAS: "facturas",
   VENTAS_PRODUCTOS: "ventas_productos",
+  CLIENTES: "clientes",
+  INFORMES: "informes",
+  ACTIVIDAD: "actividad",
 } as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[keyof typeof MODULE_KEYS];

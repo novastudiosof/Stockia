@@ -17,7 +17,8 @@ panel de super administrador.
    `004_storage.sql`, `005_permisos_limites_pos.sql`, `006_anular_venta.sql`,
    `007_clientes.sql`, `008_stock_movements.sql`,
    `009_facturacion_organizacion.sql`, `010_producto_barcode.sql`,
-   `011_bulk_import_productos.sql`, `012_correcciones.sql`.
+   `011_bulk_import_productos.sql`, `012_correcciones.sql`,
+   `013_modulos_clientes_informes_actividad.sql`.
 
 ## 2. Crear el primer super administrador
 

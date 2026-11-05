@@ -30,7 +30,7 @@ export interface ClienteSearchResult {
 export async function searchClientes(query: string): Promise<ClienteSearchResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { results: [] };
-  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+  await requireModule(profile.organization_id, MODULE_KEYS.CLIENTES);
 
   const trimmed = query.trim();
   if (trimmed.length < 2) return { results: [] };
@@ -59,7 +59,7 @@ export async function createCliente(
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
-  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+  await requireModule(profile.organization_id, MODULE_KEYS.CLIENTES);
 
   const parsed = clienteSchema.safeParse({
     nombre: formData.get("nombre"),
@@ -94,7 +94,7 @@ export async function updateCliente(
   const profile = await requireProfile();
   if (profile.role !== "owner") return { error: "Solo el administrador puede editar clientes" };
   if (!profile.organization_id) return { error: "Sin organización asociada" };
-  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+  await requireModule(profile.organization_id, MODULE_KEYS.CLIENTES);
 
   const parsed = clienteSchema.safeParse({
     nombre: formData.get("nombre"),
@@ -127,7 +127,7 @@ export async function deleteCliente(clienteId: string, clienteNombre: string) {
   const profile = await requireProfile();
   if (profile.role !== "owner") return { error: "Solo el administrador puede eliminar clientes" };
   if (!profile.organization_id) return { error: "Sin organización asociada" };
-  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+  await requireModule(profile.organization_id, MODULE_KEYS.CLIENTES);
 
   const supabase = await createClient();
   const { error } = await supabase.from("clientes").delete().eq("id", clienteId);

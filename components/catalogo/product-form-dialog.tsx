@@ -28,15 +28,24 @@ export function ProductFormDialog({
   product,
   action,
 }: ProductFormDialogProps) {
-  const [state, formAction, pending] = useActionState(action, undefined);
   const formRef = React.useRef<HTMLFormElement>(null);
 
-  React.useEffect(() => {
-    if (state && !state.error) {
+  // Las acciones devuelven undefined al guardar con éxito; por eso se cierra
+  // el diálogo aquí, al terminar la acción sin error (antes nunca se cerraba).
+  const wrappedAction = async (
+    prev: { error?: string } | void,
+    formData: FormData
+  ) => {
+    const result = await action(prev, formData);
+    if (!result?.error) {
       onOpenChange(false);
       formRef.current?.reset();
     }
-  }, [state, onOpenChange]);
+    return result;
+  };
+
+  const [state, formAction, pending] = useActionState(wrappedAction, undefined);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -7,7 +7,7 @@ import type { Cliente } from "@/lib/supabase/types";
 export default async function ClientesPage() {
   const profile = await requireProfile();
   if (!profile.organization_id) return null;
-  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+  await requireModule(profile.organization_id, MODULE_KEYS.CLIENTES);
 
   const supabase = await createClient();
   const { data: clientes } = await supabase

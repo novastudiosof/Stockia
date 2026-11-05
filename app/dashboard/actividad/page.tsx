@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth";
+import { requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityLogEntry } from "@/lib/supabase/types";
 
@@ -21,6 +22,7 @@ export default async function ActividadPage() {
       </p>
     );
   }
+  await requireModule(profile.organization_id, MODULE_KEYS.ACTIVIDAD);
   const supabase = await createClient();
 
   const { data: entries } = await supabase

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Diff, Search, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,7 +123,7 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
                         onClick={() => setAdjusting(product)}
                         aria-label="Ajustar stock"
                       >
-                        <ArrowUpDown className="h-4 w-4" />
+                        <Diff className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditing(product)}>
                         <Pencil className="h-4 w-4" />

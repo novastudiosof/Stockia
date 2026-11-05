@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth";
+import { requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { VentasReportCard } from "@/components/informes/ventas-report-card";
 import { VentasProductosReportCard } from "@/components/informes/ventas-productos-report-card";
@@ -9,6 +10,7 @@ const LOW_STOCK_THRESHOLD = 10;
 export default async function InformesPage() {
   const profile = await requireRole("owner");
   if (!profile.organization_id) return null;
+  await requireModule(profile.organization_id, MODULE_KEYS.INFORMES);
 
   const supabase = await createClient();
   const { data: products } = await supabase

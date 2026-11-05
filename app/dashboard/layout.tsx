@@ -1,4 +1,5 @@
 import { requireProfile } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { getModulesWithStatus, MODULE_KEYS } from "@/lib/modules";
 import { Sidebar, type SidebarNavItem } from "@/components/sidebar";
 import { BrandFooter } from "@/components/brand-footer";
@@ -22,6 +23,17 @@ export default async function DashboardLayout({
     profile.organization_id && !isSuperAdmin
       ? await getModulesWithStatus(profile.organization_id)
       : [];
+
+  let logoUrl: string | null = null;
+  if (profile.organization_id && !isSuperAdmin) {
+    const supabase = await createClient();
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("logo_url")
+      .eq("id", profile.organization_id)
+      .single();
+    logoUrl = org?.logo_url ?? null;
+  }
 
   const isModuleEnabled = (key: string) =>
     modules.find((m) => m.key === key)?.enabled ?? false;
@@ -54,7 +66,7 @@ export default async function DashboardLayout({
       href: "/dashboard/clientes",
       label: "Clientes",
       icon: "clientes",
-      locked: !isModuleEnabled(MODULE_KEYS.VENTAS_PRODUCTOS),
+      locked: !isModuleEnabled(MODULE_KEYS.CLIENTES),
     });
 
     if (profile.role === "owner") {
@@ -62,8 +74,14 @@ export default async function DashboardLayout({
         href: "/dashboard/actividad",
         label: "Registro de Actividad",
         icon: "actividad",
+        locked: !isModuleEnabled(MODULE_KEYS.ACTIVIDAD),
       });
-      items.push({ href: "/dashboard/informes", label: "Informes", icon: "informes" });
+      items.push({
+        href: "/dashboard/informes",
+        label: "Informes",
+        icon: "informes",
+        locked: !isModuleEnabled(MODULE_KEYS.INFORMES),
+      });
     }
 
     items.push({ href: "/dashboard/modulos", label: "Módulos", icon: "modulos" });
@@ -77,6 +95,7 @@ export default async function DashboardLayout({
         fullName={profile.full_name}
         roleLabel={ROLE_LABELS[profile.role] ?? profile.role}
         items={items}
+        logoUrl={logoUrl}
       />
       <main className="flex flex-1 flex-col px-4 py-6 pt-20 md:px-8 md:py-8 md:pt-8">
         <div className="mx-auto w-full max-w-6xl flex-1">{children}</div>

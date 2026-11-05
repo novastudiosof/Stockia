@@ -187,11 +187,16 @@ export async function updateInvoiceSettings(
       return { error: `El logo no puede superar ${MAX_LOGO_FILE_SIZE_MB}MB` };
     }
     const path = `${organizationId}/logo-${crypto.randomUUID()}`;
-    const { error: uploadError } = await supabase.storage
+    // Se sube con la service role: la política de storage de "branding" exige
+    // que la carpeta sea la organización del usuario, y el super admin no
+    // pertenece a ninguna, así que con su sesión la subida siempre fallaba.
+    // La autorización ya se validó arriba (requireRole("super_admin")).
+    const admin = createAdminClient();
+    const { error: uploadError } = await admin.storage
       .from("branding")
       .upload(path, file, { contentType: file.type, upsert: true });
     if (uploadError) return { error: friendlyDbError(uploadError, "updateInvoiceSettings:upload", "No se pudo subir el logo") };
-    logoUrl = supabase.storage.from("branding").getPublicUrl(path).data.publicUrl;
+    logoUrl = admin.storage.from("branding").getPublicUrl(path).data.publicUrl;
   }
 
   const { error } = await supabase

@@ -38,10 +38,25 @@ export function CategoryFormDialog({
   category,
   action,
 }: CategoryFormDialogProps) {
-  const [state, formAction, pending] = useActionState(action, undefined);
+  const formRef = React.useRef<HTMLFormElement>(null);
+
+  // Las acciones devuelven undefined al guardar con éxito; por eso se cierra
+  // el diálogo aquí, al terminar la acción sin error (antes nunca se cerraba).
+  const wrappedAction = async (
+    prev: { error?: string } | void,
+    formData: FormData
+  ) => {
+    const result = await action(prev, formData);
+    if (!result?.error) {
+      onOpenChange(false);
+      formRef.current?.reset();
+    }
+    return result;
+  };
+
+  const [state, formAction, pending] = useActionState(wrappedAction, undefined);
   const [icon, setIcon] = React.useState(category?.icon ?? ICON_OPTIONS[0]);
   const [color, setColor] = React.useState(category?.color ?? COLOR_OPTIONS[0]);
-  const formRef = React.useRef<HTMLFormElement>(null);
 
   React.useEffect(() => {
     if (open) {
@@ -50,12 +65,6 @@ export function CategoryFormDialog({
     }
   }, [open, category]);
 
-  React.useEffect(() => {
-    if (state && !state.error) {
-      onOpenChange(false);
-      formRef.current?.reset();
-    }
-  }, [state, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

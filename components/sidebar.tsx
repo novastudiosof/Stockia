@@ -56,9 +56,10 @@ interface SidebarProps {
   fullName: string;
   roleLabel: string;
   items: SidebarNavItem[];
+  logoUrl?: string | null;
 }
 
-export function Sidebar({ fullName, roleLabel, items }: SidebarProps) {
+export function Sidebar({ fullName, roleLabel, items, logoUrl }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -72,7 +73,16 @@ export function Sidebar({ fullName, roleLabel, items }: SidebarProps) {
   const content = (
     <div className="flex h-full flex-col bg-brand-ink text-white">
       <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-        <Image src="/brand/logo.svg" alt="Logo" width={40} height={40} />
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt="Logo de tu negocio"
+            className="h-10 w-10 rounded-full bg-white object-contain"
+          />
+        ) : (
+          <Image src="/brand/logo.svg" alt="Logo" width={40} height={40} />
+        )}
         <div>
           <p className="text-sm font-semibold leading-tight">Stockia</p>
           <p className="text-xs text-white/60">{roleLabel}</p>
@@ -121,7 +131,16 @@ export function Sidebar({ fullName, roleLabel, items }: SidebarProps) {
     <>
       <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between bg-brand-ink px-4 py-3 text-white md:hidden">
         <div className="flex items-center gap-2">
-          <Image src="/brand/logo.svg" alt="Logo" width={28} height={28} />
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt="Logo de tu negocio"
+              className="h-7 w-7 rounded-full bg-white object-contain"
+            />
+          ) : (
+            <Image src="/brand/logo.svg" alt="Logo" width={28} height={28} />
+          )}
           <span className="text-sm font-semibold">Stockia</span>
         </div>
         <button onClick={() => setOpen(true)} aria-label="Abrir menú">

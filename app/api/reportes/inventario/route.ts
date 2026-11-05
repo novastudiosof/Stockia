@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { requireProfile } from "@/lib/auth";
+import { isModuleEnabled, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import type { Category, Product } from "@/lib/supabase/types";
 
@@ -11,6 +12,9 @@ export async function GET() {
   const profile = await requireProfile();
   if (!profile.organization_id || profile.role !== "owner") {
     return new Response("No autorizado", { status: 403 });
+  }
+  if (!(await isModuleEnabled(profile.organization_id, MODULE_KEYS.INFORMES))) {
+    return new Response("Módulo no habilitado", { status: 403 });
   }
 
   const supabase = await createClient();
