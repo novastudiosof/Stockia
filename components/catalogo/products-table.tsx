@@ -76,7 +76,7 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-brand-md)] border border-brand-border bg-white">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="table-stack w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-brand-border text-left text-brand-muted">
               <th className="p-3 font-medium">Producto</th>
@@ -97,13 +97,13 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
             )}
             {filtered.map((product) => (
               <tr key={product.id} className="border-b border-brand-border last:border-0">
-                <td className="p-3 font-medium text-brand-ink">
+                <td data-label="Producto" className="p-3 font-medium text-brand-ink">
                   {product.name}
                   {product.barcode && (
                     <p className="text-xs font-normal text-brand-muted">Cód: {product.barcode}</p>
                   )}
                 </td>
-                <td className="p-3">
+                <td data-label="Cantidad" className="p-3">
                   <div className="flex items-center gap-2">
                     {product.quantity}
                     {product.quantity <= LOW_STOCK_THRESHOLD && (
@@ -111,11 +111,11 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
                     )}
                   </div>
                 </td>
-                <td className="p-3">{currency.format(product.purchase_price)}</td>
-                <td className="p-3">{currency.format(product.sale_price)}</td>
-                <td className="p-3 text-brand-muted">{product.description || "—"}</td>
+                <td data-label="Precio compra" className="p-3">{currency.format(product.purchase_price)}</td>
+                <td data-label="Precio venta" className="p-3">{currency.format(product.sale_price)}</td>
+                <td data-label="Descripción" className="p-3 text-brand-muted">{product.description || "—"}</td>
                 {canEdit && (
-                  <td className="p-3">
+                  <td data-label="" className="p-3">
                     <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"

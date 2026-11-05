@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useActionState } from "react";
-import Image from "next/image";
+import { ImagePlus, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,21 @@ import type { Organization } from "@/lib/supabase/types";
 export function InvoiceSettings({ organization }: { organization: Organization }) {
   const boundAction = updateInvoiceSettings.bind(null, organization.id);
   const [state, formAction, pending] = useActionState(boundAction, undefined);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = React.useState<string | null>(null);
+  const [fileName, setFileName] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setFileName(file?.name ?? null);
+    setPreview(file ? URL.createObjectURL(file) : null);
+  }
 
   return (
     <Card>
@@ -94,17 +109,45 @@ export function InvoiceSettings({ organization }: { organization: Organization }
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label htmlFor="logo">Logo</Label>
-              {organization.logo_url && (
-                <Image
-                  src={organization.logo_url}
-                  alt="Logo actual"
-                  width={120}
-                  height={48}
-                  unoptimized
-                  className="h-12 w-auto object-contain"
+              <div className="flex flex-wrap items-center gap-4">
+                {preview || organization.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={preview ?? organization.logo_url ?? ""}
+                    alt="Logo"
+                    className="h-16 w-16 rounded-full border border-brand-border bg-white object-contain"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-brand-border text-brand-muted">
+                    <ImagePlus className="h-6 w-6" />
+                  </div>
+                )}
+                <div className="flex flex-col gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="self-start"
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {organization.logo_url || preview ? "Cambiar logo" : "Subir logo"}
+                  </Button>
+                  <p className="text-xs text-brand-muted">
+                    {fileName
+                      ? `Seleccionado: ${fileName} — pulsa "Guardar datos de facturación" para aplicarlo.`
+                      : "PNG, JPG o WEBP, hasta 3 MB."}
+                  </p>
+                </div>
+                <input
+                  ref={fileRef}
+                  id="logo"
+                  name="logo"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleFileChange}
                 />
-              )}
-              <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" />
+              </div>
             </div>
           </div>
 

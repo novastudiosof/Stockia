@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { friendlyDbError } from "@/lib/db-errors";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import { saleInputSchema } from "@/lib/validations/ventas-productos";
-import type { Sale } from "@/lib/supabase/types";
+import type { PaymentInput, Sale } from "@/lib/supabase/types";
 
 type ActionResult = {
   error?: string;
@@ -28,7 +28,9 @@ export interface NewCustomerInput {
 
 export async function createSale(
   items: { productId: string; quantity: number }[],
-  customer?: { id?: string; data?: NewCustomerInput }
+  customer?: { id?: string; data?: NewCustomerInput },
+  payment?: PaymentInput,
+  customerEmail?: string
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
@@ -36,6 +38,8 @@ export async function createSale(
 
   const parsed = saleInputSchema.safeParse({
     items,
+    payment,
+    customerEmail,
     customerId: customer?.id,
     customerData: customer?.data,
   });
@@ -48,6 +52,8 @@ export async function createSale(
       p_items: parsed.data.items,
       p_customer_id: parsed.data.customerId ?? null,
       p_customer_data: parsed.data.customerData ?? null,
+      p_payment: parsed.data.payment,
+      p_customer_email: parsed.data.customerEmail || null,
     })
     .single<{ sale_id: string; total: number; sale_number: number }>();
 

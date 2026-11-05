@@ -2,7 +2,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CategoryCard } from "@/components/catalogo/category-card";
 import { AddCategoryButton } from "@/components/catalogo/add-category-button";
-import { ImportProductsButton } from "@/components/catalogo/import-products-button";
+import { ProductSearch } from "@/components/catalogo/product-search";
 import type { Category } from "@/lib/supabase/types";
 
 export default async function CatalogoPage() {
@@ -31,7 +31,7 @@ export default async function CatalogoPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-brand-ink">Catálogo</h1>
           <p className="text-sm text-brand-muted">
@@ -39,12 +39,11 @@ export default async function CatalogoPage() {
           </p>
         </div>
         {canEdit && (
-          <div className="flex gap-2">
-            <ImportProductsButton />
-            <AddCategoryButton />
-          </div>
+          <AddCategoryButton />
         )}
       </div>
+
+      {list.length > 0 && <ProductSearch />}
 
       {list.length === 0 ? (
         <div className="rounded-[var(--radius-brand-md)] border border-dashed border-brand-border bg-white p-10 text-center text-brand-muted">

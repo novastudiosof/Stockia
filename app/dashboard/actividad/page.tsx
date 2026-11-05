@@ -44,7 +44,7 @@ export default async function ActividadPage() {
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-brand-md)] border border-brand-border bg-white">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="table-stack w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-brand-border text-left text-brand-muted">
               <th className="p-3 font-medium">Fecha</th>
@@ -64,15 +64,15 @@ export default async function ActividadPage() {
             )}
             {list.map((entry) => (
               <tr key={entry.id} className="border-b border-brand-border last:border-0">
-                <td className="p-3 whitespace-nowrap">
+                <td data-label="Fecha" className="p-3 whitespace-nowrap">
                   {new Date(entry.created_at).toLocaleString("es-CO")}
                 </td>
-                <td className="p-3 font-medium text-brand-ink">{entry.username}</td>
-                <td className="p-3 text-brand-muted">
+                <td data-label="Usuario" className="p-3 font-medium text-brand-ink">{entry.username}</td>
+                <td data-label="Rol" className="p-3 text-brand-muted">
                   {ROLE_LABELS[entry.role] ?? entry.role}
                 </td>
-                <td className="p-3">{entry.action}</td>
-                <td className="p-3 text-brand-muted">{entry.details || "—"}</td>
+                <td data-label="Acción" className="p-3">{entry.action}</td>
+                <td data-label="Detalle" className="p-3 text-brand-muted">{entry.details || "—"}</td>
               </tr>
             ))}
           </tbody>

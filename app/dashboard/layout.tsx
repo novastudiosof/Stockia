@@ -44,12 +44,16 @@ export default async function DashboardLayout({
     items.push({ href: "/superadmin", label: "Organizaciones", icon: "superadmin" });
   } else {
     items.push({ href: "/dashboard/catalogo", label: "Catálogo", icon: "catalogo" });
-    items.push({
-      href: "/dashboard/ventas",
-      label: "Ventas y Gastos",
-      icon: "ventas",
-      locked: !isModuleEnabled(MODULE_KEYS.VENTAS_GASTOS),
-    });
+    // Ventas y Gastos (incluido el cierre de caja) es solo del administrador;
+    // los auxiliares registran ventas desde Ventas por Productos.
+    if (profile.role === "owner") {
+      items.push({
+        href: "/dashboard/ventas",
+        label: "Ventas y Gastos",
+        icon: "ventas",
+        locked: !isModuleEnabled(MODULE_KEYS.VENTAS_GASTOS),
+      });
+    }
     items.push({
       href: "/dashboard/facturas",
       label: "Facturas",
@@ -97,7 +101,7 @@ export default async function DashboardLayout({
         items={items}
         logoUrl={logoUrl}
       />
-      <main className="flex flex-1 flex-col px-4 py-6 pt-20 md:px-8 md:py-8 md:pt-8">
+      <main className="flex min-w-0 flex-1 flex-col px-4 py-6 pt-20 md:px-8 md:py-8 md:pt-8">
         <div className="mx-auto w-full max-w-6xl flex-1">{children}</div>
         <BrandFooter />
       </main>

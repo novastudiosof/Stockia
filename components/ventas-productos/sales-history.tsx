@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { voidSale, searchSales } from "@/lib/actions/ventas-productos";
+import { paymentLabel } from "@/lib/payments";
 import type { Sale } from "@/lib/supabase/types";
 
 const currency = new Intl.NumberFormat("es-CO", {
@@ -133,7 +134,7 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
               sale.voided_at ? "opacity-60" : ""
             }`}
           >
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm text-brand-muted">
                   {sale.sale_number ? `#${sale.sale_number} · ` : ""}
@@ -160,11 +161,10 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
                 )}
               </div>
             </div>
-            {sale.customer_snapshot && (
-              <p className="mt-1 text-xs text-brand-muted">
-                Cliente: {sale.customer_snapshot.nombre}
-              </p>
-            )}
+            <p className="mt-1 text-xs text-brand-muted">
+              {sale.customer_snapshot && <>Cliente: {sale.customer_snapshot.nombre} · </>}
+              Vendido por: {sale.sold_by_name ?? "—"} · Pago: {paymentLabel(sale)}
+            </p>
             <ul className="mt-2 flex flex-col gap-1 text-sm text-brand-muted">
               {sale.items.map((item, idx) => (
                 <li key={idx} className="flex justify-between">

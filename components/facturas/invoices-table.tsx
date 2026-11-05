@@ -78,7 +78,7 @@ export function InvoicesTable({ invoices, canEdit }: InvoicesTableProps) {
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-brand-md)] border border-brand-border bg-white">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="table-stack w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-brand-border text-left text-brand-muted">
               <th className="p-3 font-medium">Proveedor</th>
@@ -98,11 +98,11 @@ export function InvoicesTable({ invoices, canEdit }: InvoicesTableProps) {
             )}
             {filtered.map((invoice) => (
               <tr key={invoice.id} className="border-b border-brand-border last:border-0">
-                <td className="p-3 font-medium text-brand-ink">{invoice.provider}</td>
-                <td className="p-3">{invoice.invoice_number}</td>
-                <td className="p-3">{invoice.occurred_at}</td>
-                <td className="p-3">{currency.format(invoice.amount)}</td>
-                <td className="p-3">
+                <td data-label="Proveedor" className="p-3 font-medium text-brand-ink">{invoice.provider}</td>
+                <td data-label="N° factura" className="p-3">{invoice.invoice_number}</td>
+                <td data-label="Fecha" className="p-3">{invoice.occurred_at}</td>
+                <td data-label="Monto" className="p-3">{currency.format(invoice.amount)}</td>
+                <td data-label="" className="p-3">
                   <div className="flex justify-end gap-1">
                     {invoice.file_path && (
                       <Button

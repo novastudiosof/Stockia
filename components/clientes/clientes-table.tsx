@@ -64,7 +64,7 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-brand-md)] border border-brand-border bg-white">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="table-stack w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-brand-border text-left text-brand-muted">
               <th className="p-3 font-medium">Nombre</th>
@@ -87,13 +87,13 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
             )}
             {filtered.map((cliente) => (
               <tr key={cliente.id} className="border-b border-brand-border last:border-0">
-                <td className="p-3 font-medium text-brand-ink">{cliente.nombre}</td>
-                <td className="p-3 text-brand-muted">{cliente.documento || "—"}</td>
-                <td className="p-3 text-brand-muted">{cliente.telefono || "—"}</td>
-                <td className="p-3 text-brand-muted">{cliente.email || "—"}</td>
-                <td className="p-3 text-brand-muted">{cliente.direccion || "—"}</td>
+                <td data-label="Nombre" className="p-3 font-medium text-brand-ink">{cliente.nombre}</td>
+                <td data-label="Documento" className="p-3 text-brand-muted">{cliente.documento || "—"}</td>
+                <td data-label="Teléfono" className="p-3 text-brand-muted">{cliente.telefono || "—"}</td>
+                <td data-label="Correo" className="p-3 text-brand-muted">{cliente.email || "—"}</td>
+                <td data-label="Dirección" className="p-3 text-brand-muted">{cliente.direccion || "—"}</td>
                 {canEdit && (
-                  <td className="p-3">
+                  <td data-label="" className="p-3">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" onClick={() => setEditing(cliente)}>
                         <Pencil className="h-4 w-4" />

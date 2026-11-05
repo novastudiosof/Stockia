@@ -37,7 +37,6 @@ export const stockAdjustmentSchema = z.object({
 });
 
 export const bulkImportRowSchema = z.object({
-  categoria: z.string().trim().min(1, "La categoría es obligatoria").max(80),
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(120),
   cantidad: z.coerce.number().int().min(0, "La cantidad no puede ser negativa"),
   precioCompra: z.coerce.number().min(0, "El precio de compra no puede ser negativo"),

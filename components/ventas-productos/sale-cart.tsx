@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createSale } from "@/lib/actions/ventas-productos";
 import { searchClientes } from "@/lib/actions/clientes";
-import type { Cliente, Product } from "@/lib/supabase/types";
+import type { Cliente, PaymentInput, Product, TransferChannel } from "@/lib/supabase/types";
 
 const currency = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -24,7 +24,23 @@ interface CartLine {
 
 interface SaleCartProps {
   products: Product[];
+  /** Si el módulo Clientes no está activo, solo se vende a "Consumidor final". */
+  clientesEnabled: boolean;
 }
+
+type PayMethod = "efectivo" | "transferencia" | "mixto";
+
+const PAY_METHOD_LABEL: Record<PayMethod, string> = {
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  mixto: "Mixto",
+};
+
+const CHANNEL_LABEL: Record<TransferChannel, string> = {
+  nequi: "Nequi",
+  daviplata: "Daviplata",
+  llave: "Llave",
+};
 
 type CustomerMode = "none" | "existing" | "new";
 
@@ -34,7 +50,7 @@ const CUSTOMER_MODE_LABEL: Record<CustomerMode, string> = {
   new: "Cliente nuevo",
 };
 
-export function SaleCart({ products }: SaleCartProps) {
+export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [cart, setCart] = React.useState<Record<string, CartLine>>({});
@@ -53,6 +69,11 @@ export function SaleCart({ products }: SaleCartProps) {
     direccion: "",
   });
 
+  const [customerEmail, setCustomerEmail] = React.useState("");
+  const [payMethod, setPayMethod] = React.useState<PayMethod>("efectivo");
+  const [channel, setChannel] = React.useState<TransferChannel>("nequi");
+  const [mixed, setMixed] = React.useState({ efectivo: "", nequi: "", daviplata: "", llave: "" });
+
   const term = search.toLowerCase();
   const filtered = products.filter(
     (p) => p.name.toLowerCase().includes(term) || (p.barcode ?? "").toLowerCase().includes(term)
@@ -60,6 +81,12 @@ export function SaleCart({ products }: SaleCartProps) {
 
   const lines = Object.values(cart);
   const total = lines.reduce((sum, line) => sum + line.product.sale_price * line.quantity, 0);
+  const mixedSum =
+    (Number(mixed.efectivo) || 0) +
+    (Number(mixed.nequi) || 0) +
+    (Number(mixed.daviplata) || 0) +
+    (Number(mixed.llave) || 0);
+  const mixedRemaining = total - mixedSum;
 
   React.useEffect(() => {
     if (customerMode !== "existing" || selectedCustomer) {
@@ -129,6 +156,28 @@ export function SaleCart({ products }: SaleCartProps) {
       return;
     }
 
+    if (payMethod === "mixto" && Math.abs(mixedRemaining) > 0.009) {
+      setError(
+        mixedRemaining > 0
+          ? `Faltan ${currency.format(mixedRemaining)} por asignar en el pago mixto`
+          : `El pago mixto se pasa por ${currency.format(-mixedRemaining)}`
+      );
+      return;
+    }
+
+    const payment: PaymentInput =
+      payMethod === "efectivo"
+        ? { method: "efectivo" }
+        : payMethod === "transferencia"
+          ? { method: "transferencia", channel }
+          : {
+              method: "mixto",
+              efectivo: Number(mixed.efectivo) || 0,
+              nequi: Number(mixed.nequi) || 0,
+              daviplata: Number(mixed.daviplata) || 0,
+              llave: Number(mixed.llave) || 0,
+            };
+
     setSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -137,12 +186,14 @@ export function SaleCart({ products }: SaleCartProps) {
       customerMode === "existing" && selectedCustomer
         ? { id: selectedCustomer.id }
         : customerMode === "new"
-          ? { data: newCustomer }
+          ? { data: { ...newCustomer, email: customerEmail.trim() } }
           : undefined;
 
     const result = await createSale(
       lines.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
-      customer
+      customer,
+      payment,
+      customerEmail.trim() || undefined
     );
 
     setSubmitting(false);
@@ -153,6 +204,10 @@ export function SaleCart({ products }: SaleCartProps) {
 
     setSuccess(`Venta registrada por ${currency.format(result.total ?? 0)}`);
     setCart({});
+    setCustomerEmail("");
+    setPayMethod("efectivo");
+    setChannel("nequi");
+    setMixed({ efectivo: "", nequi: "", daviplata: "", llave: "" });
     selectCustomerMode("none");
     setNewCustomer({ nombre: "", documento: "", telefono: "", direccion: "" });
     router.refresh();
@@ -208,20 +263,35 @@ export function SaleCart({ products }: SaleCartProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <div className="flex gap-1 rounded-[var(--radius-brand-sm)] border border-brand-border p-1 text-xs">
-              {(Object.keys(CUSTOMER_MODE_LABEL) as CustomerMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => selectCustomerMode(mode)}
-                  className={`flex-1 rounded-[var(--radius-brand-sm)] px-2 py-1 transition-colors ${
-                    customerMode === mode ? "bg-brand text-brand-ink" : "text-brand-muted"
-                  }`}
-                >
-                  {CUSTOMER_MODE_LABEL[mode]}
-                </button>
-              ))}
-            </div>
+            {clientesEnabled ? (
+              <div className="flex gap-1 rounded-[var(--radius-brand-sm)] border border-brand-border p-1 text-xs">
+                {(Object.keys(CUSTOMER_MODE_LABEL) as CustomerMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => selectCustomerMode(mode)}
+                    className={`flex-1 rounded-[var(--radius-brand-sm)] px-2 py-1 transition-colors ${
+                      customerMode === mode ? "bg-brand text-brand-ink" : "text-brand-muted"
+                    }`}
+                  >
+                    {CUSTOMER_MODE_LABEL[mode]}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-brand-muted">
+                Venta a consumidor final. Para guardar clientes, activa el módulo Clientes.
+              </p>
+            )}
+
+            {customerMode !== "existing" && (
+              <Input
+                type="email"
+                placeholder="Correo del cliente (opcional)"
+                value={customerEmail}
+                onChange={(event) => setCustomerEmail(event.target.value)}
+              />
+            )}
 
             {customerMode === "existing" &&
               (selectedCustomer ? (
@@ -356,6 +426,81 @@ export function SaleCart({ products }: SaleCartProps) {
             <div className="flex items-center justify-between border-t border-brand-border pt-3 font-semibold text-brand-ink">
               <span>Total</span>
               <span>{currency.format(total)}</span>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-brand-border pt-3">
+              <p className="text-sm font-medium text-brand-ink">Método de pago</p>
+              <div className="flex gap-1 rounded-[var(--radius-brand-sm)] border border-brand-border p-1 text-xs">
+                {(Object.keys(PAY_METHOD_LABEL) as PayMethod[]).map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setPayMethod(method)}
+                    className={`flex-1 rounded-[var(--radius-brand-sm)] px-2 py-1 transition-colors ${
+                      payMethod === method ? "bg-brand text-brand-ink" : "text-brand-muted"
+                    }`}
+                  >
+                    {PAY_METHOD_LABEL[method]}
+                  </button>
+                ))}
+              </div>
+
+              {payMethod === "transferencia" && (
+                <div className="flex gap-1 text-xs">
+                  {(Object.keys(CHANNEL_LABEL) as TransferChannel[]).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setChannel(option)}
+                      className={`flex-1 rounded-[var(--radius-brand-sm)] border px-2 py-1.5 transition-colors ${
+                        channel === option
+                          ? "border-brand bg-brand/10 text-brand-ink"
+                          : "border-brand-border text-brand-muted"
+                      }`}
+                    >
+                      {CHANNEL_LABEL[option]}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {payMethod === "mixto" && (
+                <div className="flex flex-col gap-2">
+                  {(
+                    [
+                      ["efectivo", "Efectivo"],
+                      ["nequi", "Nequi"],
+                      ["daviplata", "Daviplata"],
+                      ["llave", "Llave"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <span className="w-20 text-sm text-brand-muted">{label}</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="1"
+                        placeholder="0"
+                        value={mixed[key]}
+                        onChange={(event) =>
+                          setMixed((m) => ({ ...m, [key]: event.target.value }))
+                        }
+                      />
+                    </div>
+                  ))}
+                  <p
+                    className={`text-xs ${
+                      Math.abs(mixedRemaining) < 0.01 ? "text-brand-success" : "text-brand-muted"
+                    }`}
+                  >
+                    {Math.abs(mixedRemaining) < 0.01
+                      ? "Pago completo"
+                      : mixedRemaining > 0
+                        ? `Faltan ${currency.format(mixedRemaining)}`
+                        : `Sobran ${currency.format(-mixedRemaining)}`}
+                  </p>
+                </div>
+              )}
             </div>
 
             {error && <p className="text-sm text-brand-danger">{error}</p>}

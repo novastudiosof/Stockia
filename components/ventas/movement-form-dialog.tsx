@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Movement, MovementType } from "@/lib/supabase/types";
+import type { Movement, MovementConcept, MovementType } from "@/lib/supabase/types";
 
 interface MovementFormDialogProps {
   open: boolean;
@@ -21,10 +21,17 @@ interface MovementFormDialogProps {
   movement?: Movement;
   defaultType?: MovementType;
   warnNoEdit?: boolean;
+  concepts?: MovementConcept[];
   action: (prev: { error?: string } | void, formData: FormData) => Promise<{ error?: string } | void>;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Fecha local (no UTC): cerca de la medianoche toISOString() daría el día siguiente.
+const today = () => {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+};
 
 export function MovementFormDialog({
   open,
@@ -32,11 +39,20 @@ export function MovementFormDialog({
   movement,
   defaultType = "venta",
   warnNoEdit = false,
+  concepts = [],
   action,
 }: MovementFormDialogProps) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [type, setType] = React.useState<MovementType>(movement?.type ?? defaultType);
   const formRef = React.useRef<HTMLFormElement>(null);
+  const typeConcepts = concepts.filter((c) => c.type === type);
+  // Si el movimiento editado tiene un concepto que ya no está en la lista, se
+  // conserva como opción para no perderlo al guardar.
+  const currentConcept = movement?.type === type ? movement.concept : null;
+  const conceptOptions =
+    currentConcept && !typeConcepts.some((c) => c.name === currentConcept)
+      ? [...typeConcepts.map((c) => c.name), currentConcept]
+      : typeConcepts.map((c) => c.name);
 
   React.useEffect(() => {
     if (open) setType(movement?.type ?? defaultType);
@@ -75,6 +91,27 @@ export function MovementFormDialog({
             >
               Gasto
             </Button>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="concept">Concepto</Label>
+            <select
+              key={type}
+              id="concept"
+              name="concept"
+              defaultValue={currentConcept ?? ""}
+              className="h-9 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+            >
+              <option value="">Sin concepto</option>
+              {conceptOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-brand-muted">
+              Puedes agregar o quitar conceptos desde Mi Cuenta.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">

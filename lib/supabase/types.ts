@@ -122,7 +122,39 @@ export type Movement = {
   description: string | null;
   occurred_at: string;
   file_path: string | null;
+  concept: string | null;
   created_by: string | null;
+  created_at: string;
+};
+
+export type MovementConcept = {
+  id: string;
+  organization_id: string;
+  type: MovementType;
+  name: string;
+  created_at: string;
+};
+
+export type PaymentMethod = "efectivo" | "transferencia" | "mixto";
+export type TransferChannel = "nequi" | "daviplata" | "llave";
+
+export type CashDay = {
+  organization_id: string;
+  day: string;
+  base_amount: number;
+  closed_at: string | null;
+  closed_by: string | null;
+  closed_by_name: string | null;
+  sales_cash: number;
+  sales_nequi: number;
+  sales_daviplata: number;
+  sales_llave: number;
+  manual_sales: number;
+  expenses: number;
+  expected_cash: number;
+  counted_cash: number | null;
+  difference: number | null;
+  notes: string | null;
   created_at: string;
 };
 
@@ -146,6 +178,14 @@ export type Sale = {
   customer_id: string | null;
   customer_snapshot: CustomerSnapshot | null;
   sale_number: number | null;
+  payment_method: PaymentMethod;
+  pay_cash: number;
+  pay_nequi: number;
+  pay_daviplata: number;
+  pay_llave: number;
+  sold_by_name: string | null;
+  customer_email: string | null;
+  email_sent_at: string | null;
 };
 
 export type Invoice = {
@@ -192,6 +232,30 @@ type NewCustomerData = {
   email?: string;
   direccion?: string;
 };
+
+export type CashDaySummary = {
+  sales_count: number;
+  sales_total: number;
+  sales_cash: number;
+  sales_nequi: number;
+  sales_daviplata: number;
+  sales_llave: number;
+  manual_sales: number;
+  expenses: number;
+};
+
+export type DailySales = { day: string; sales_count: number; total: number };
+
+export type PaymentInput =
+  | { method: "efectivo" }
+  | { method: "transferencia"; channel: TransferChannel }
+  | {
+      method: "mixto";
+      efectivo: number;
+      nequi: number;
+      daviplata: number;
+      llave: number;
+    };
 
 type BulkImportItem = {
   categoryId: string;
@@ -274,6 +338,19 @@ export type Database = {
         Update: Partial<Cliente>;
         Relationships: [];
       };
+      movement_concepts: {
+        Row: MovementConcept;
+        Insert: Partial<MovementConcept> &
+          Pick<MovementConcept, "organization_id" | "type" | "name">;
+        Update: Partial<MovementConcept>;
+        Relationships: [];
+      };
+      cash_days: {
+        Row: CashDay;
+        Insert: Partial<CashDay> & Pick<CashDay, "organization_id" | "day">;
+        Update: Partial<CashDay>;
+        Relationships: [];
+      };
       stock_movements: {
         Row: StockMovement;
         Insert: Partial<StockMovement> &
@@ -303,8 +380,30 @@ export type Database = {
           p_items: NewSaleItemInput[];
           p_customer_id?: string | null;
           p_customer_data?: NewCustomerData | null;
+          p_payment?: PaymentInput | null;
+          p_customer_email?: string | null;
         };
         Returns: { sale_id: string; total: number; sale_number: number }[];
+      };
+      set_cash_base: {
+        Args: { p_day: string; p_base: number };
+        Returns: undefined;
+      };
+      close_cash_day: {
+        Args: { p_day: string; p_counted: number; p_notes?: string | null };
+        Returns: CashDay;
+      };
+      cash_day_summary: {
+        Args: { p_day: string };
+        Returns: CashDaySummary[];
+      };
+      daily_sales: {
+        Args: Record<string, never>;
+        Returns: DailySales[];
+      };
+      reopen_cash_day: {
+        Args: { p_day: string };
+        Returns: undefined;
       };
       void_sale: {
         Args: { p_sale_id: string };

@@ -4,24 +4,27 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Category } from "@/lib/supabase/types";
 
-export async function GET() {
+export async function GET(request: Request) {
   const profile = await requireProfile();
   if (!profile.organization_id || profile.role !== "owner") {
     return new Response("No autorizado", { status: 403 });
   }
 
+  const categoryId = new URL(request.url).searchParams.get("categoria") || "";
   const supabase = await createClient();
-  const { data: categories } = await supabase
+  const { data: category } = await supabase
     .from("categories")
     .select("*")
+    .eq("id", categoryId)
     .eq("organization_id", profile.organization_id)
-    .order("name", { ascending: true });
+    .maybeSingle();
+  if (!category) return new Response("Categoría no encontrada", { status: 404 });
+  const categoryName = (category as Category).name;
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Productos");
 
   sheet.columns = [
-    { header: "Categoría", key: "categoria", width: 24 },
     { header: "Nombre", key: "nombre", width: 30 },
     { header: "Cantidad", key: "cantidad", width: 12 },
     { header: "Precio compra", key: "precioCompra", width: 16 },
@@ -31,9 +34,7 @@ export async function GET() {
   ];
   sheet.getRow(1).font = { bold: true };
 
-  const firstCategory = ((categories as Category[]) ?? [])[0]?.name ?? "Mi categoría";
   sheet.addRow({
-    categoria: firstCategory,
     nombre: "Producto de ejemplo",
     cantidad: 10,
     precioCompra: 1000,
@@ -42,15 +43,12 @@ export async function GET() {
     codigoBarras: "",
   });
 
-  const categoriesSheet = workbook.addWorksheet("Categorías existentes");
-  categoriesSheet.columns = [{ header: "Categoría", key: "nombre", width: 30 }];
-  categoriesSheet.getRow(1).font = { bold: true };
-  for (const category of (categories as Category[]) ?? []) {
-    categoriesSheet.addRow({ nombre: category.name });
-  }
-  if (!categories || categories.length === 0) {
-    categoriesSheet.addRow({ nombre: "(Aún no tienes categorías — crea una primero)" });
-  }
+  const info = workbook.addWorksheet("Instrucciones");
+  info.columns = [{ header: "Instrucciones", key: "texto", width: 90 }];
+  info.getRow(1).font = { bold: true };
+  info.addRow({ texto: `Estos productos se importarán a la categoría: ${categoryName}` });
+  info.addRow({ texto: "Borra la fila de ejemplo y escribe un producto por fila en la hoja Productos." });
+  info.addRow({ texto: "Obligatorios: Nombre, Cantidad, Precio compra y Precio venta. Descripción y Código de barras son opcionales." });
 
   const buffer = await workbook.xlsx.writeBuffer();
 

@@ -47,3 +47,47 @@ body {
   color: var(--foreground);
   font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
+
+/* ==========================================================================
+   Tablas apiladas en móvil: cada fila se convierte en una tarjeta y cada
+   celda muestra su encabezado (atributo data-label). Evita el scroll
+   horizontal en pantallas pequeñas.
+   ========================================================================== */
+@media (max-width: 767px) {
+  table.table-stack {
+    min-width: 0 !important;
+  }
+  table.table-stack thead {
+    display: none;
+  }
+  table.table-stack,
+  table.table-stack tbody,
+  table.table-stack tr {
+    display: block;
+    width: 100%;
+  }
+  table.table-stack tr {
+    padding: 0.5rem 0.75rem;
+  }
+  table.table-stack td[data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.35rem 0 !important;
+    text-align: right;
+  }
+  table.table-stack td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    text-align: left;
+  }
+  table.table-stack td[data-label=""]::before {
+    display: none;
+  }
+  table.table-stack td[data-label=""] {
+    justify-content: flex-end;
+  }
+}

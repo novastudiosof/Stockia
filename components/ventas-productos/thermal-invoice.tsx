@@ -16,6 +16,8 @@ interface ThermalInvoiceProps {
   items: SaleItem[];
   total: number;
   organization: Organization;
+  soldBy?: string | null;
+  paymentText?: string | null;
 }
 
 export function ThermalInvoice({
@@ -26,6 +28,8 @@ export function ThermalInvoice({
   items,
   total,
   organization,
+  soldBy,
+  paymentText,
 }: ThermalInvoiceProps) {
   const [width, setWidth] = React.useState<Width>("80");
 
@@ -102,6 +106,7 @@ export function ThermalInvoice({
           <p>Cliente: {customer?.nombre ?? "Consumidor final"}</p>
           {customer?.documento && <p>Doc: {customer.documento}</p>}
           {customer?.telefono && <p>Tel: {customer.telefono}</p>}
+          {soldBy && <p>Vendido por: {soldBy}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5 border-t border-dashed border-brand-muted pt-2">
@@ -122,6 +127,7 @@ export function ThermalInvoice({
           <span>TOTAL</span>
           <span>{money(total)}</span>
         </div>
+        {paymentText && <p className="pt-1">Pago: {paymentText}</p>}
 
         {organization.invoice_footer && (
           <p className="border-t border-dashed border-brand-muted pt-2 text-center">

@@ -7,6 +7,7 @@ import { requireProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase/server";
 import { friendlyDbError } from "@/lib/db-errors";
+import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import {
   categorySchema,
   productSchema,
@@ -250,7 +251,6 @@ type BulkImportResult = {
 };
 
 const IMPORT_COLUMNS = [
-  "categoria",
   "nombre",
   "cantidad",
   "precioCompra",
@@ -270,15 +270,17 @@ export async function bulkImportProducts(formData: FormData): Promise<BulkImport
     return { error: `El archivo no puede superar ${MAX_IMPORT_FILE_SIZE_MB}MB` };
   }
 
+  // La importación es por categoría: todos los productos del archivo van a la
+  // categoría desde la que se abrió el diálogo (así no hay columna que errar).
+  const categoryId = String(formData.get("categoryId") ?? "");
   const supabase = await createClient();
-  const { data: categories } = await supabase
+  const { data: category } = await supabase
     .from("categories")
-    .select("id, name")
-    .eq("organization_id", profile.organization_id);
-
-  const categoryByName = new Map(
-    (categories ?? []).map((c) => [c.name.trim().toLowerCase(), c.id as string])
-  );
+    .select("id")
+    .eq("id", categoryId)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
+  if (!category) return { error: "La categoría no existe" };
 
   const workbook = new ExcelJS.Workbook();
   try {
@@ -306,16 +308,15 @@ export async function bulkImportProducts(formData: FormData): Promise<BulkImport
 
     const values = row.values as unknown[];
     const raw = {
-      categoria: String(values[1] ?? "").trim(),
-      nombre: String(values[2] ?? "").trim(),
-      cantidad: values[3],
-      precioCompra: values[4],
-      precioVenta: values[5],
-      descripcion: String(values[6] ?? "").trim(),
-      codigoBarras: String(values[7] ?? "").trim(),
+      nombre: String(values[1] ?? "").trim(),
+      cantidad: values[2],
+      precioCompra: values[3],
+      precioVenta: values[4],
+      descripcion: String(values[5] ?? "").trim(),
+      codigoBarras: String(values[6] ?? "").trim(),
     };
 
-    if (!raw.categoria && !raw.nombre) return; // fila vacía, se ignora
+    if (!raw.nombre) return; // fila vacía, se ignora
 
     const parsed = bulkImportRowSchema.safeParse(raw);
     if (!parsed.success) {
@@ -325,16 +326,6 @@ export async function bulkImportProducts(formData: FormData): Promise<BulkImport
           : "fila";
         rowErrors.push({ row: rowNumber, field, message: issue.message });
       }
-      return;
-    }
-
-    const categoryId = categoryByName.get(parsed.data.categoria.toLowerCase());
-    if (!categoryId) {
-      rowErrors.push({
-        row: rowNumber,
-        field: "categoria",
-        message: `La categoría "${parsed.data.categoria}" no existe en tu catálogo`,
-      });
       return;
     }
 
@@ -370,5 +361,59 @@ export async function bulkImportProducts(formData: FormData): Promise<BulkImport
 
   await logActivity(profile, "Importó productos", `${items.length} productos`);
   revalidatePath("/dashboard/catalogo");
+  revalidatePath(`/dashboard/catalogo/${categoryId}`);
   return { insertedCount: (data as number) ?? items.length };
+}
+
+export type ProductSearchResult = {
+  id: string;
+  name: string;
+  barcode: string | null;
+  quantity: number;
+  sale_price: number;
+  category_id: string;
+  category_name: string;
+  category_icon: string;
+};
+
+/** Busca productos por nombre o código de barras en todas las categorías. */
+export async function searchProducts(query: string): Promise<ProductSearchResult[]> {
+  const profile = await requireProfile();
+  if (!profile.organization_id) return [];
+
+  const safe = sanitizeOrFilterTerm(query.trim());
+  if (safe.length < 2) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("products")
+    .select("id, name, barcode, quantity, sale_price, category_id, categories(name, icon)")
+    .eq("organization_id", profile.organization_id)
+    .or(`name.ilike.%${safe}%,barcode.ilike.%${safe}%`)
+    .order("name", { ascending: true })
+    .limit(30);
+
+  type Row = {
+    id: string;
+    name: string;
+    barcode: string | null;
+    quantity: number;
+    sale_price: number;
+    category_id: string;
+    categories: { name: string; icon: string } | { name: string; icon: string }[] | null;
+  };
+
+  return ((data as unknown as Row[]) ?? []).map((row) => {
+    const category = Array.isArray(row.categories) ? row.categories[0] : row.categories;
+    return {
+      id: row.id,
+      name: row.name,
+      barcode: row.barcode,
+      quantity: row.quantity,
+      sale_price: Number(row.sale_price),
+      category_id: row.category_id,
+      category_name: category?.name ?? "",
+      category_icon: category?.icon ?? "",
+    };
+  });
 }

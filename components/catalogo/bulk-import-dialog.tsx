@@ -16,9 +16,16 @@ import { bulkImportProducts, type BulkImportRowError } from "@/lib/actions/catal
 interface BulkImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  categoryId: string;
+  categoryName: string;
 }
 
-export function BulkImportDialog({ open, onOpenChange }: BulkImportDialogProps) {
+export function BulkImportDialog({
+  open,
+  onOpenChange,
+  categoryId,
+  categoryName,
+}: BulkImportDialogProps) {
   const router = useRouter();
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [pending, setPending] = React.useState(false);
@@ -62,16 +69,16 @@ export function BulkImportDialog({ open, onOpenChange }: BulkImportDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Importar productos desde Excel</DialogTitle>
+          <DialogTitle>Importar productos a &quot;{categoryName}&quot;</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
           <p className="text-sm text-brand-muted">
-            El archivo debe tener las columnas Categoría, Nombre, Cantidad, Precio compra, Precio
-            venta, Descripción (opcional) y Código de barras (opcional). La categoría debe existir
-            ya en tu catálogo.{" "}
+            Descarga la plantilla, llénala con los productos de esta categoría (Nombre, Cantidad,
+            Precio compra, Precio venta, y opcionalmente Descripción y Código de barras) y súbela
+            aquí. Todos quedarán dentro de esta categoría.{" "}
             <a
-              href="/api/reportes/plantilla-productos"
+              href={`/api/reportes/plantilla-productos?categoria=${categoryId}`}
               className="font-medium text-brand-dark underline-offset-4 hover:underline"
             >
               Descargar plantilla
@@ -79,6 +86,7 @@ export function BulkImportDialog({ open, onOpenChange }: BulkImportDialogProps) 
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <input type="hidden" name="categoryId" value={categoryId} />
             <input
               ref={fileRef}
               type="file"

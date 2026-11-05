@@ -1,5 +1,5 @@
 import { requireProfile } from "@/lib/auth";
-import { requireModule, MODULE_KEYS } from "@/lib/modules";
+import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { SaleCart } from "@/components/ventas-productos/sale-cart";
 import { SalesHistory } from "@/components/ventas-productos/sales-history";
@@ -9,6 +9,8 @@ export default async function VentasProductosPage() {
   const profile = await requireProfile();
   if (!profile.organization_id) return null;
   await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+
+  const clientesEnabled = await isModuleEnabled(profile.organization_id, MODULE_KEYS.CLIENTES);
 
   const supabase = await createClient();
 
@@ -35,7 +37,7 @@ export default async function VentasProductosPage() {
         </p>
       </div>
 
-      <SaleCart products={(products as Product[]) ?? []} />
+      <SaleCart products={(products as Product[]) ?? []} clientesEnabled={clientesEnabled} />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-brand-ink">Ventas recientes</h2>

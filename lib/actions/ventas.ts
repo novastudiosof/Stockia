@@ -25,17 +25,36 @@ function validateFile(file: File | null): string | null {
   return null;
 }
 
+/** Un día con cierre de caja ya no admite cambios en sus movimientos. */
+async function assertDayOpen(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  day: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("cash_days")
+    .select("closed_at")
+    .eq("organization_id", organizationId)
+    .eq("day", day)
+    .maybeSingle();
+  return data?.closed_at
+    ? `El día ${day} ya tiene cierre de caja; reábrelo para modificar sus movimientos`
+    : null;
+}
+
 export async function createMovement(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
+  if (profile.role !== "owner") return { error: "Solo el administrador puede registrar movimientos" };
   await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_GASTOS);
 
   const parsed = movementSchema.safeParse({
     type: formData.get("type"),
     amount: formData.get("amount"),
+    concept: formData.get("concept") ?? "",
     description: formData.get("description") ?? "",
     occurredAt: formData.get("occurredAt"),
   });
@@ -46,6 +65,8 @@ export async function createMovement(
   if (fileError) return { error: fileError };
 
   const supabase = await createClient();
+  const closedError = await assertDayOpen(supabase, profile.organization_id, parsed.data.occurredAt);
+  if (closedError) return { error: closedError };
   let filePath: string | null = null;
 
   if (file && file.size > 0) {
@@ -60,6 +81,7 @@ export async function createMovement(
     organization_id: profile.organization_id,
     type: parsed.data.type,
     amount: parsed.data.amount,
+    concept: parsed.data.concept || null,
     description: parsed.data.description || null,
     occurred_at: parsed.data.occurredAt,
     file_path: filePath,
@@ -88,17 +110,29 @@ export async function updateMovement(
   const parsed = movementSchema.safeParse({
     type: formData.get("type"),
     amount: formData.get("amount"),
+    concept: formData.get("concept") ?? "",
     description: formData.get("description") ?? "",
     occurredAt: formData.get("occurredAt"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
   const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("movements")
+    .select("occurred_at")
+    .eq("id", movementId)
+    .single();
+  for (const day of [current?.occurred_at, parsed.data.occurredAt]) {
+    if (!day) continue;
+    const closedError = await assertDayOpen(supabase, profile.organization_id, day);
+    if (closedError) return { error: closedError };
+  }
   const { error } = await supabase
     .from("movements")
     .update({
       type: parsed.data.type,
       amount: parsed.data.amount,
+      concept: parsed.data.concept || null,
       description: parsed.data.description || null,
       occurred_at: parsed.data.occurredAt,
     })
@@ -116,6 +150,15 @@ export async function deleteMovement(movementId: string) {
   await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_GASTOS);
 
   const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("movements")
+    .select("occurred_at")
+    .eq("id", movementId)
+    .single();
+  if (current?.occurred_at) {
+    const closedError = await assertDayOpen(supabase, profile.organization_id, current.occurred_at);
+    if (closedError) return { error: closedError };
+  }
   const { error } = await supabase.from("movements").delete().eq("id", movementId);
   if (error) return { error: friendlyDbError(error, "deleteMovement", "No se pudo eliminar el movimiento") };
 

@@ -11,7 +11,7 @@ Registrado: 2026-11-02
 - Hoy el cuadro queda abierto y hay que volver a pulsar "Agregar" para abrirlo.
 
 ## 2. Diseño responsive (móvil)
-- [ ] Hoy en móvil hay que hacer scroll horizontal para ver la pantalla completa
+- [x] (2026-11-05) Hoy en móvil hay que hacer scroll horizontal para ver la pantalla completa
   (productos, tablas, etc.).
 - Adaptar el layout, el sidebar y las tablas para pantallas pequeñas.
 
@@ -20,23 +20,23 @@ Registrado: 2026-11-02
 - Cambiarlo por un **+** (y un **−** para restar) que refleje lo que hace.
 
 ## 4. Ventas por productos → Ventas y Gastos + cierre de caja
-- [ ] Las ventas hechas en "Ventas por productos" deben reflejarse
+- [x] (2026-11-05, requiere migración 014) Las ventas hechas en "Ventas por productos" deben reflejarse
   automáticamente en el módulo "Ventas y Gastos".
-- [ ] Desde "Ventas y Gastos" se debe poder hacer un **cierre de caja**.
-- [ ] Se debe poder registrar una **base de dinero** (efectivo inicial de caja)
+- [x] (2026-11-05, requiere migración 014) Desde "Ventas y Gastos" se debe poder hacer un **cierre de caja**.
+- [x] (2026-11-05, requiere migración 014) Se debe poder registrar una **base de dinero** (efectivo inicial de caja)
   para el cierre.
 
 ## 5. Correo del cliente en la venta por productos
-- [ ] Agregar el campo de correo del cliente en la venta por productos.
+- [x] (2026-11-05, requiere migración 014) Agregar el campo de correo del cliente en la venta por productos.
 - Es importante tenerlo, pero **opcional** (no obligatorio).
 
 ## 6. Métodos de pago
-- [ ] Agregar método de pago en la venta:
+- [x] (2026-11-05, requiere migración 014) Agregar método de pago en la venta:
   - **Efectivo**
   - **Transferencia**, indicando el origen: **Nequi**, **Daviplata** o **Llave**
   - **Mixto** (combinación de los anteriores, con el monto de cada uno)
-- [ ] El método de pago debe verse reflejado en el **cierre de caja**.
-- [ ] El método de pago debe verse reflejado en los **informes**.
+- [x] (2026-11-05, requiere migración 014) El método de pago debe verse reflejado en el **cierre de caja**.
+- [x] (2026-11-05, requiere migración 014) El método de pago debe verse reflejado en los **informes**.
 
 ## Notas
 - Las mejoras 4, 5 y 6 están relacionadas (venta → método de pago → cierre de

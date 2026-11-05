@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { requireProfile } from "@/lib/auth";
+import { paymentLabel } from "@/lib/payments";
 import { isModuleEnabled, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import type { Sale } from "@/lib/supabase/types";
@@ -44,6 +45,8 @@ export async function GET(request: Request) {
     { header: "Documento", key: "documento", width: 16 },
     { header: "Productos", key: "productos", width: 50 },
     { header: "Total", key: "total", width: 16 },
+    { header: "Método de pago", key: "pago", width: 22 },
+    { header: "Vendido por", key: "vendedor", width: 24 },
     { header: "Estado", key: "estado", width: 12 },
   ];
   sheet.getRow(1).font = { bold: true };
@@ -61,6 +64,8 @@ export async function GET(request: Request) {
       documento: sale.customer_snapshot?.documento || "",
       productos: productosResumen,
       total: Number(sale.total),
+      pago: paymentLabel(sale),
+      vendedor: sale.sold_by_name || "",
       estado: sale.voided_at ? "Anulada" : "Activa",
     });
 

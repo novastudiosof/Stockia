@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ProductsTable } from "@/components/catalogo/products-table";
+import { ImportProductsButton } from "@/components/catalogo/import-products-button";
 import type { Category, Product } from "@/lib/supabase/types";
 
 export default async function CategoryDetailPage({
@@ -42,10 +43,18 @@ export default async function CategoryDetailPage({
           <ArrowLeft className="h-4 w-4" />
           Catálogo
         </Link>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold text-brand-ink">
-          <span>{(category as Category).icon}</span>
-          {(category as Category).name}
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold text-brand-ink">
+            <span>{(category as Category).icon}</span>
+            {(category as Category).name}
+          </h1>
+          {profile.role === "owner" && (
+            <ImportProductsButton
+              categoryId={categoryId}
+              categoryName={(category as Category).name}
+            />
+          )}
+        </div>
       </div>
 
       <ProductsTable

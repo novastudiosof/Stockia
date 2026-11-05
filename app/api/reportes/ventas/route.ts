@@ -46,6 +46,7 @@ export async function GET(request: Request) {
   sheet.columns = [
     { header: "Fecha", key: "fecha", width: 14 },
     { header: "Tipo", key: "tipo", width: 12 },
+    { header: "Concepto", key: "concepto", width: 26 },
     { header: "Descripción", key: "descripcion", width: 40 },
     { header: "Monto", key: "monto", width: 16 },
   ];
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
     sheet.addRow({
       fecha: m.occurred_at,
       tipo: m.type === "venta" ? "Venta" : "Gasto",
+      concepto: m.concept || "",
       descripcion: m.description || "",
       monto: Number(m.amount),
     });
