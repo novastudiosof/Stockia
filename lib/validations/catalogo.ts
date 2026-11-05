@@ -45,4 +45,4 @@ export const bulkImportRowSchema = z.object({
   codigoBarras: z.string().trim().max(64),
 });
 
-export const MAX_IMPORT_FILE_SIZE_MB = 5;
+export const MAX_IMPORT_FILE_SIZE_MB = 4;

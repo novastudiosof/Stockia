@@ -14,4 +14,4 @@ export const ALLOWED_INVOICE_MIME_TYPES = [
   "image/webp",
 ];
 
-export const MAX_INVOICE_FILE_SIZE_MB = 10;
+export const MAX_INVOICE_FILE_SIZE_MB = 4;

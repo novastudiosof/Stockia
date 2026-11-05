@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AttachmentPicker } from "@/components/attachment-picker";
 import type { Invoice } from "@/lib/supabase/types";
 
 interface InvoiceFormDialogProps {
@@ -34,6 +35,7 @@ export function InvoiceFormDialog({
 }: InvoiceFormDialogProps) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const formRef = React.useRef<HTMLFormElement>(null);
+  const [preparingFile, setPreparingFile] = React.useState(false);
 
   React.useEffect(() => {
     if (state && !state.error) {
@@ -90,8 +92,8 @@ export function InvoiceFormDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="file">Adjunto (imagen o PDF)</Label>
-            <Input id="file" name="file" type="file" accept=".pdf,image/png,image/jpeg,image/webp" />
+            <Label>Adjunto (fotos o PDF)</Label>
+            <AttachmentPicker onBusyChange={setPreparingFile} />
             {invoice?.file_path && (
               <p className="text-xs text-brand-muted">
                 Ya tiene un archivo adjunto. Sube uno nuevo solo si quieres reemplazarlo.
@@ -112,8 +114,8 @@ export function InvoiceFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando..." : "Guardar"}
+            <Button type="submit" disabled={pending || preparingFile}>
+              {pending ? "Guardando..." : preparingFile ? "Preparando adjunto..." : "Guardar"}
             </Button>
           </DialogFooter>
         </form>

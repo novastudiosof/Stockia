@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AttachmentPicker } from "@/components/attachment-picker";
 import type { Movement, MovementConcept, MovementType } from "@/lib/supabase/types";
 
 interface MovementFormDialogProps {
@@ -45,6 +46,7 @@ export function MovementFormDialog({
   const [state, formAction, pending] = useActionState(action, undefined);
   const [type, setType] = React.useState<MovementType>(movement?.type ?? defaultType);
   const formRef = React.useRef<HTMLFormElement>(null);
+  const [preparingFile, setPreparingFile] = React.useState(false);
   const typeConcepts = concepts.filter((c) => c.type === type);
   // Si el movimiento editado tiene un concepto que ya no está en la lista, se
   // conserva como opción para no perderlo al guardar.
@@ -145,8 +147,8 @@ export function MovementFormDialog({
 
           {!movement && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="file">Archivo adjunto (opcional)</Label>
-              <Input id="file" name="file" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" />
+              <Label>Archivo adjunto (opcional)</Label>
+              <AttachmentPicker onBusyChange={setPreparingFile} />
             </div>
           )}
 
@@ -163,8 +165,8 @@ export function MovementFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando..." : "Guardar"}
+            <Button type="submit" disabled={pending || preparingFile}>
+              {pending ? "Guardando..." : preparingFile ? "Preparando adjunto..." : "Guardar"}
             </Button>
           </DialogFooter>
         </form>
