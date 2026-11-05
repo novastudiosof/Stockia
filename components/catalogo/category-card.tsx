@@ -23,13 +23,19 @@ export function CategoryCard({ category, productCount, canEdit }: CategoryCardPr
   const [editOpen, setEditOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const boundUpdate = updateCategory.bind(null, category.id);
 
   async function handleDelete() {
     setDeleting(true);
-    await deleteCategory(category.id, category.name);
+    setDeleteError(null);
+    const result = await deleteCategory(category.id, category.name);
     setDeleting(false);
+    if (result?.error) {
+      setDeleteError(result.error);
+      return;
+    }
     setConfirmOpen(false);
     router.refresh();
   }
@@ -38,7 +44,7 @@ export function CategoryCard({ category, productCount, canEdit }: CategoryCardPr
     <>
       <Card className="group relative flex flex-col gap-3 p-4 transition-shadow hover:shadow-md">
         {canEdit && (
-          <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="absolute right-2 top-2 z-10 flex gap-0.5">
             <Button
               variant="ghost"
               size="icon"
@@ -83,7 +89,10 @@ export function CategoryCard({ category, productCount, canEdit }: CategoryCardPr
 
       <ConfirmDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) setDeleteError(null);
+        }}
         title="Eliminar categoría"
         description={
           productCount > 0
@@ -93,6 +102,11 @@ export function CategoryCard({ category, productCount, canEdit }: CategoryCardPr
         isLoading={deleting}
         onConfirm={handleDelete}
       />
+      {deleteError && confirmOpen && (
+        <p className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 rounded bg-brand-danger px-3 py-2 text-sm text-white shadow-lg">
+          {deleteError}
+        </p>
+      )}
     </>
   );
 }
