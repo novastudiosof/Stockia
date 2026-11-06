@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -45,7 +46,9 @@ export async function getModulesWithStatus(
   }));
 }
 
-export async function isModuleEnabled(
+// cache(): en una misma petición (layout + página + acción) se consulta una
+// sola vez por organización y módulo.
+export const isModuleEnabled = cache(async function isModuleEnabled(
   organizationId: string,
   key: ModuleKey
 ): Promise<boolean> {
@@ -67,7 +70,7 @@ export async function isModuleEnabled(
     .maybeSingle();
 
   return orgModule?.enabled ?? false;
-}
+});
 
 /**
  * Corta la ejecución (server component o route handler) si el módulo no

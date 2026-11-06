@@ -39,14 +39,31 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  if (user && pathname.startsWith("/superadmin")) {
+  if (user && !isPublicPath) {
+    // Una sola consulta: rol + estado del negocio (RLS deja leer la propia
+    // organización). Si falla la consulta no se bloquea a nadie.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, organizations(is_active)")
       .eq("id", user.id)
       .single();
 
-    if (profile?.role !== "super_admin") {
+    const org = profile?.organizations as unknown as
+      | { is_active: boolean }
+      | { is_active: boolean }[]
+      | null
+      | undefined;
+    const isActive = Array.isArray(org) ? org[0]?.is_active : org?.is_active;
+
+    // Negocio desactivado: se cierra la sesión que ya estuviera abierta.
+    if (profile && profile.role !== "super_admin" && isActive === false) {
+      await supabase.auth.signOut();
+      const redirect = NextResponse.redirect(new URL("/login", request.url));
+      response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+      return redirect;
+    }
+
+    if (pathname.startsWith("/superadmin") && profile?.role !== "super_admin") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
