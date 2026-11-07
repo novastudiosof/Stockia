@@ -25,10 +25,10 @@ const COLUMNS: PreviewColumn<MovementPreviewRow>[] = [
   {
     header: "Tipo",
     cell: (m) =>
-      m.type === "venta" ? (
-        <Badge variant="success">Venta</Badge>
-      ) : (
+      m.kind === "gasto" ? (
         <Badge variant="danger">Gasto</Badge>
+      ) : (
+        <Badge variant="success">Venta</Badge>
       ),
   },
   { header: "Concepto", cell: (m) => m.concept || "—" },

@@ -215,6 +215,8 @@ export type Sale = {
   sold_by_name: string | null;
   customer_email: string | null;
   email_sent_at: string | null;
+  /** Identificador aleatorio para compartir la factura por enlace. */
+  public_token?: string;
 };
 
 export type Invoice = {
@@ -445,6 +447,28 @@ export type Database = {
           p_delta: number;
           p_reason: string;
         };
+        Returns: number;
+      };
+      ventas_gastos_feed: {
+        Args: {
+          p_from: string | null;
+          p_to: string | null;
+          p_after_day?: string | null;
+          p_after_key?: string | null;
+          p_limit?: number;
+        };
+        Returns: {
+          day: string;
+          key: string;
+          kind: "venta" | "gasto" | "venta_productos";
+          concept: string | null;
+          description: string | null;
+          amount: number;
+          sales_count: number | null;
+        }[];
+      };
+      ventas_gastos_feed_count: {
+        Args: { p_from: string | null; p_to: string | null };
         Returns: number;
       };
       profit_summary: {

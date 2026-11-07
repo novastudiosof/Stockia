@@ -8,7 +8,6 @@ import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Category,
-  Movement,
   Product,
   ProfitByPeriod,
   ProfitByProduct,
@@ -147,11 +146,24 @@ export interface MovementsPreviewFilters {
   to?: string;
 }
 
-export type MovementPreviewRow = Pick<
-  Movement,
-  "id" | "type" | "concept" | "description" | "amount" | "occurred_at"
->;
+/** Fila del listado de Ventas y Gastos: movimiento manual o ventas del día. */
+export interface MovementPreviewRow {
+  /** Id del movimiento, o "sales-AAAA-MM-DD" para las ventas por productos. */
+  id: string;
+  kind: "venta" | "gasto" | "venta_productos";
+  concept: string | null;
+  description: string | null;
+  amount: number;
+  occurred_at: string;
+}
 
+const MIGRATION_017 = "Falta ejecutar la migración 017 en Supabase";
+
+/**
+ * Igual que la pantalla "Ventas y Gastos": movimientos manuales más las
+ * ventas del carrito (una fila por día). La unión y el cursor (día, clave)
+ * se resuelven en la función ventas_gastos_feed de la base de datos.
+ */
 export async function previewMovements(
   filters: MovementsPreviewFilters,
   cursor?: string | null
@@ -160,39 +172,52 @@ export async function previewMovements(
   if (!ctx) return { rows: [], nextCursor: null };
 
   const supabase = await createClient();
-  let query = supabase
-    .from("movements")
-    .select("id, type, concept, description, amount, occurred_at", cursor ? undefined : { count: "exact" })
-    .eq("organization_id", ctx.organizationId)
-    .order("occurred_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(PAGE_SIZE + 1);
-
-  if (isDay(filters.from)) query = query.gte("occurred_at", filters.from);
-  if (isDay(filters.to)) query = query.lte("occurred_at", filters.to);
-
+  const from = isDay(filters.from) ? filters.from : null;
+  const to = isDay(filters.to) ? filters.to : null;
   const parts = splitCursor(cursor);
-  if (parts) {
-    const [day, id] = parts;
-    query = query.or(`occurred_at.lt.${day},and(occurred_at.eq.${day},id.lt.${id})`);
-  }
 
-  const { data, error, count } = await query;
-  if (error) {
+  const [feed, count] = await Promise.all([
+    supabase.rpc("ventas_gastos_feed", {
+      p_from: from,
+      p_to: to,
+      p_after_day: parts?.[0] ?? null,
+      p_after_key: parts?.[1] ?? null,
+      p_limit: PAGE_SIZE + 1,
+    }),
+    cursor
+      ? Promise.resolve({ data: null, error: null })
+      : supabase.rpc("ventas_gastos_feed_count", { p_from: from, p_to: to }),
+  ]);
+
+  const failure = feed.error ?? count.error;
+  if (failure) {
     return {
       rows: [],
       nextCursor: null,
-      error: friendlyDbError(error, "previewMovements", "No se pudieron cargar los movimientos"),
+      error: friendlyDbError(failure, "previewMovements", "No se pudieron cargar los movimientos", {
+        PGRST202: MIGRATION_017,
+        "42883": MIGRATION_017,
+      }),
     };
   }
 
-  const all = (data as unknown as MovementPreviewRow[]) ?? [];
-  const rows = all.slice(0, PAGE_SIZE);
-  const last = rows[rows.length - 1];
+  const all = feed.data ?? [];
+  const page = all.slice(0, PAGE_SIZE);
+  const last = page[page.length - 1];
   return {
-    rows,
-    nextCursor: all.length > PAGE_SIZE && last ? `${last.occurred_at}|${last.id}` : null,
-    total: cursor ? undefined : (count ?? rows.length),
+    rows: page.map((r) => ({
+      id: r.key,
+      kind: r.kind,
+      concept: r.concept,
+      description:
+        r.kind === "venta_productos"
+          ? `${r.sales_count ?? 0} venta${r.sales_count === 1 ? "" : "s"} del día`
+          : r.description,
+      amount: Number(r.amount),
+      occurred_at: r.day,
+    })),
+    nextCursor: all.length > PAGE_SIZE && last ? `${last.day}|${last.key}` : null,
+    total: cursor ? undefined : Number(count.data ?? page.length),
   };
 }
 
@@ -299,7 +324,10 @@ export async function getProfitReport(
 
   const failure = summary.error ?? byProduct.error ?? byPeriod.error;
   if (failure || !summary.data) {
-    return { error: friendlyDbError(failure, "getProfitReport", "No se pudo calcular la utilidad") };
+    return { error: friendlyDbError(failure, "getProfitReport", "No se pudo calcular la utilidad", {
+        PGRST202: "Falta ejecutar la migración 016 en Supabase",
+        "42883": "Falta ejecutar la migración 016 en Supabase",
+      }) };
   }
 
   const num = (v: unknown) => Number(v) || 0;

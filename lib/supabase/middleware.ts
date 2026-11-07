@@ -28,7 +28,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublicPath = pathname === "/login" || pathname.startsWith("/api/auth/login");
+  // /factura/<token> es la factura compartida por WhatsApp: el token es un
+  // UUID aleatorio, así que el cliente la ve sin iniciar sesión.
+  const isPublicPath =
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/factura/");
 
   if (!user && !isPublicPath) {
     const loginUrl = new URL("/login", request.url);

@@ -1,11 +1,15 @@
 import ExcelJS from "exceljs";
 
 import { requireProfile } from "@/lib/auth";
+import { isDay } from "@/lib/dates";
 import { isModuleEnabled, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
-import type { Movement } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
 
 const currencyFormat = '"$"#,##0';
+type FeedRow = Database["public"]["Functions"]["ventas_gastos_feed"]["Returns"][number];
+const FEED_PAGE = 101;
+const MAX_PAGES = 100; // tope de seguridad: ~10.000 filas
 
 export async function GET(request: Request) {
   const profile = await requireProfile();
@@ -17,28 +21,53 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const from = searchParams.get("from") || "";
-  const to = searchParams.get("to") || "";
+  const fromParam = searchParams.get("from") || "";
+  const toParam = searchParams.get("to") || "";
+  const from = isDay(fromParam) ? fromParam : null;
+  const to = isDay(toParam) ? toParam : null;
 
+  // Mismo origen de datos que la pantalla "Ventas y Gastos" y la vista
+  // previa: movimientos manuales más las ventas del carrito (una fila por día).
   const supabase = await createClient();
-  let query = supabase
-    .from("movements")
-    .select("*")
-    .eq("organization_id", profile.organization_id)
-    .order("occurred_at", { ascending: true });
+  const rows: {
+    day: string;
+    kind: string;
+    concept: string | null;
+    description: string | null;
+    amount: number;
+    sales_count: number | null;
+  }[] = [];
 
-  if (from) query = query.gte("occurred_at", from);
-  if (to) query = query.lte("occurred_at", to);
+  let afterDay: string | null = null;
+  let afterKey: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const result = await supabase.rpc("ventas_gastos_feed", {
+      p_from: from,
+      p_to: to,
+      p_after_day: afterDay,
+      p_after_key: afterKey,
+      p_limit: FEED_PAGE,
+    });
+    const { data, error }: { data: FeedRow[] | null; error: unknown } = result;
+    if (error) {
+      console.error("[reporte ventas]", error);
+      return new Response("No se pudo generar el reporte", { status: 500 });
+    }
+    const batch: FeedRow[] = data ?? [];
+    rows.push(...batch.map((r) => ({ ...r, amount: Number(r.amount) })));
+    if (batch.length < FEED_PAGE) break;
+    const last: FeedRow = batch[batch.length - 1];
+    afterDay = last.day;
+    afterKey = last.key;
+  }
+  rows.sort((a, b) => (a.day === b.day ? 0 : a.day < b.day ? -1 : 1));
 
-  const { data } = await query;
-  const movements = (data as Movement[]) ?? [];
-
-  const totalVentas = movements
-    .filter((m) => m.type === "venta")
-    .reduce((sum, m) => sum + Number(m.amount), 0);
-  const totalGastos = movements
-    .filter((m) => m.type === "gasto")
-    .reduce((sum, m) => sum + Number(m.amount), 0);
+  const totalVentas = rows
+    .filter((r) => r.kind !== "gasto")
+    .reduce((sum, r) => sum + r.amount, 0);
+  const totalGastos = rows
+    .filter((r) => r.kind === "gasto")
+    .reduce((sum, r) => sum + r.amount, 0);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Ventas y Gastos");
@@ -51,13 +80,16 @@ export async function GET(request: Request) {
     { header: "Monto", key: "monto", width: 16 },
   ];
 
-  for (const m of movements) {
+  for (const r of rows) {
     sheet.addRow({
-      fecha: m.occurred_at,
-      tipo: m.type === "venta" ? "Venta" : "Gasto",
-      concepto: m.concept || "",
-      descripcion: m.description || "",
-      monto: Number(m.amount),
+      fecha: r.day,
+      tipo: r.kind === "gasto" ? "Gasto" : "Venta",
+      concepto: r.concept || "",
+      descripcion:
+        r.kind === "venta_productos"
+          ? `${r.sales_count ?? 0} venta${r.sales_count === 1 ? "" : "s"} del día`
+          : r.description || "",
+      monto: r.amount,
     });
   }
   sheet.getColumn("monto").numFmt = currencyFormat;

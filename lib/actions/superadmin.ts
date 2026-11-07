@@ -175,7 +175,10 @@ export async function updateOrganizationAppearance(
     .update({ business_type: parsed.data.businessType, theme_color: parsed.data.themeColor })
     .eq("id", organizationId);
   if (error) {
-    return { error: friendlyDbError(error, "updateOrganizationAppearance", "No se pudo guardar la apariencia") };
+    return { error: friendlyDbError(error, "updateOrganizationAppearance", "No se pudo guardar la apariencia", {
+        PGRST204: "Falta ejecutar la migración 015 en Supabase",
+        "42703": "Falta ejecutar la migración 015 en Supabase",
+      }) };
   }
 
   await logActivity(

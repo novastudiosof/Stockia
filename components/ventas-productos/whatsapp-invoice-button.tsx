@@ -4,7 +4,8 @@ import * as React from "react";
 import { Loader2, MessageCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { buildInvoicePdf, downloadBlob, normalizeWhatsappNumber } from "@/lib/invoice-client";
+import { getInvoiceShareLink } from "@/lib/actions/ventas-productos";
+import { normalizeWhatsappNumber } from "@/lib/invoice-client";
 
 interface WhatsappInvoiceButtonProps {
   saleId: string;
@@ -15,10 +16,10 @@ interface WhatsappInvoiceButtonProps {
 }
 
 /**
- * Envía la factura por WhatsApp al número del cliente. En celulares con
- * soporte comparte el PDF directamente; si no, descarga el PDF y abre el chat
- * de WhatsApp con el mensaje listo (un enlace de WhatsApp no puede adjuntar
- * archivos, así que ahí solo falta adjuntar el PDF descargado).
+ * Abre de una vez el chat de WhatsApp del cliente con el mensaje listo y el
+ * enlace a su factura. WhatsApp no permite adjuntar un archivo desde un
+ * enlace, así que la factura va como enlace público (se abre sin cuenta y
+ * se puede guardar como PDF).
  */
 export function WhatsappInvoiceButton({
   saleId,
@@ -44,34 +45,29 @@ export function WhatsappInvoiceButton({
       }
     }
 
+    // La pestaña se abre ya, dentro del clic, para que el navegador no la
+    // bloquee; después se le pone la dirección cuando el enlace esté listo.
+    const popup = window.open("about:blank", "_blank");
     setBusy(true);
     try {
-      const invoice = await buildInvoicePdf(saleId);
-      if ("error" in invoice) {
-        setError(invoice.error);
+      const share = await getInvoiceShareLink(saleId);
+      if (share.error || !share.url) {
+        popup?.close();
+        setError(share.error ?? "No se pudo preparar el enlace");
         return;
       }
 
-      const greeting =
-        invoice.customerName === "Consumidor final" ? "Hola" : `Hola ${invoice.customerName}`;
       const text =
-        `${greeting}, gracias por tu compra en ${invoice.orgName}. ` +
-        `Factura ${invoice.invoiceNumber} por ${invoice.totalText}.`;
+        `Hola, adjunto la factura de tu compra.\n` +
+        `Somos ${share.orgName ?? "tu tienda"}.\n` +
+        share.url;
+      const target = `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 
-      const file = new File([invoice.blob], invoice.fileName, { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], text });
-          return;
-        } catch (shareError) {
-          if ((shareError as Error).name === "AbortError") return;
-        }
-      }
-
-      downloadBlob(invoice.blob, invoice.fileName);
-      window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      if (popup) popup.location.href = target;
+      else window.location.href = target;
     } catch {
-      setError("No se pudo preparar el envío por WhatsApp");
+      popup?.close();
+      setError("No se pudo abrir WhatsApp");
     } finally {
       setBusy(false);
     }

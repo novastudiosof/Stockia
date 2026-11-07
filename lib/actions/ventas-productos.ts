@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
 import { requireProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
@@ -161,4 +162,56 @@ export async function getInvoiceTicket(saleId: string): Promise<InvoiceTicketRes
 
   if (!sale || !organization) return { error: "No se encontró la factura" };
   return { sale: sale as Sale, organization: organization as Organization };
+}
+
+export interface InvoiceShareResult {
+  error?: string;
+  /** Enlace público de la factura (no exige iniciar sesión). */
+  url?: string;
+  orgName?: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+}
+
+/**
+ * Datos para enviar la factura por WhatsApp: un enlace público con token
+ * aleatorio (/factura/<token>) que el cliente abre sin cuenta.
+ */
+export async function getInvoiceShareLink(saleId: string): Promise<InvoiceShareResult> {
+  const profile = await requireProfile();
+  if (!profile.organization_id) return { error: "Sin organización asociada" };
+  await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
+
+  const supabase = await createClient();
+  const [{ data: sale, error }, { data: org }] = await Promise.all([
+    supabase
+      .from("sales")
+      .select("public_token, customer_snapshot")
+      .eq("id", saleId)
+      .eq("organization_id", profile.organization_id)
+      .single(),
+    supabase.from("organizations").select("name, legal_name").eq("id", profile.organization_id).single(),
+  ]);
+
+  if (error || !sale?.public_token) {
+    return {
+      error: error
+        ? friendlyDbError(error, "getInvoiceShareLink", "No se pudo preparar el enlace", {
+            "42703": "Falta ejecutar la migración 017 en Supabase",
+          })
+        : "No se encontró la factura",
+    };
+  }
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+  const base = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || `${proto}://${host}`;
+
+  return {
+    url: `${base}/factura/${sale.public_token}`,
+    orgName: org?.name ?? undefined,
+    customerName: sale.customer_snapshot?.nombre ?? null,
+    customerPhone: sale.customer_snapshot?.telefono ?? null,
+  };
 }

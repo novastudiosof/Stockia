@@ -31,7 +31,7 @@ export default async function DashboardLayout({
     const supabase = await createClient();
     const { data: org } = await supabase
       .from("organizations")
-      .select("logo_url, theme_color")
+      .select("*")
       .eq("id", profile.organization_id)
       .single();
     logoUrl = org?.logo_url ?? null;
