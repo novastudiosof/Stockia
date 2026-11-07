@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getModulesWithStatus, MODULE_KEYS } from "@/lib/modules";
 import { Sidebar, type SidebarNavItem } from "@/components/sidebar";
 import { BrandFooter } from "@/components/brand-footer";
+import { darken, isHexColor } from "@/lib/theme";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super administrador",
@@ -25,14 +26,16 @@ export default async function DashboardLayout({
       : [];
 
   let logoUrl: string | null = null;
+  let themeColor: string | null = null;
   if (profile.organization_id && !isSuperAdmin) {
     const supabase = await createClient();
     const { data: org } = await supabase
       .from("organizations")
-      .select("logo_url")
+      .select("logo_url, theme_color")
       .eq("id", profile.organization_id)
       .single();
     logoUrl = org?.logo_url ?? null;
+    themeColor = isHexColor(org?.theme_color) ? org.theme_color : null;
   }
 
   const isModuleEnabled = (key: string) =>
@@ -95,6 +98,11 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
+      {themeColor && (
+        // El color ya está validado como #RRGGBB; va en :root para que también
+        // lo hereden los diálogos, que se montan fuera de este contenedor.
+        <style>{`:root{--color-primary:${themeColor};--color-primary-dark:${darken(themeColor)};}`}</style>
+      )}
       <div className="app-aurora" aria-hidden="true">
         <div className="app-aurora-grid" />
       </div>

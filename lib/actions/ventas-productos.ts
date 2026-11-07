@@ -124,8 +124,10 @@ export async function searchSales(filters: SaleSearchFilters): Promise<SaleSearc
     }
     query = query.or(orClauses.join(","));
   }
-  if (filters.from) query = query.gte("created_at", filters.from);
-  if (filters.to) query = query.lte("created_at", `${filters.to}T23:59:59`);
+  // Los días se interpretan en hora de Colombia (UTC-5, sin horario de
+  // verano), igual que daily_sales() y el cierre de caja.
+  if (filters.from) query = query.gte("created_at", `${filters.from}T00:00:00-05:00`);
+  if (filters.to) query = query.lte("created_at", `${filters.to}T23:59:59.999-05:00`);
 
   const { data, error } = await query;
   if (error) {

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { friendlyDbError } from "@/lib/db-errors";
 import {
+  appearanceSchema,
   createOrganizationSchema,
   invoiceSettingsSchema,
   ALLOWED_LOGO_MIME_TYPES,
@@ -30,6 +31,7 @@ export async function createOrganization(
     ownerUsername: formData.get("ownerUsername"),
     ownerPassword: formData.get("ownerPassword"),
     maxAuxiliares: formData.get("maxAuxiliares") || 1,
+    businessType: formData.get("businessType") || "general",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
@@ -41,6 +43,7 @@ export async function createOrganization(
       name: parsed.data.name,
       slug: parsed.data.slug,
       max_auxiliares: parsed.data.maxAuxiliares,
+      business_type: parsed.data.businessType,
     })
     .select()
     .single();
@@ -154,6 +157,35 @@ export async function updateOrganizationLimits(
     `${maxCategorias} categorías, ${maxProductosPorCategoria} productos c/u`
   );
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);
+}
+
+export async function updateOrganizationAppearance(
+  organizationId: string,
+  businessType: string,
+  themeColor: string | null
+): Promise<{ error?: string }> {
+  const profile = await requireRole("super_admin");
+
+  const parsed = appearanceSchema.safeParse({ businessType, themeColor });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("organizations")
+    .update({ business_type: parsed.data.businessType, theme_color: parsed.data.themeColor })
+    .eq("id", organizationId);
+  if (error) {
+    return { error: friendlyDbError(error, "updateOrganizationAppearance", "No se pudo guardar la apariencia") };
+  }
+
+  await logActivity(
+    profile,
+    "Actualizó apariencia de la organización",
+    `${parsed.data.businessType} ${parsed.data.themeColor ?? "color por defecto"}`
+  );
+  revalidatePath(`/superadmin/organizaciones/${organizationId}`);
+  revalidatePath("/dashboard", "layout");
+  return {};
 }
 
 export async function updateInvoiceSettings(

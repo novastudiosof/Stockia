@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createOrganization } from "@/lib/actions/superadmin";
+import { BUSINESS_TYPES, BUSINESS_TYPE_KEYS } from "@/lib/business-types";
 
 export default function NuevaOrganizacionPage() {
   const [state, formAction, pending] = useActionState(createOrganization, undefined);
@@ -40,6 +41,25 @@ export default function NuevaOrganizacionPage() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="slug">Identificador (slug)</Label>
               <Input id="slug" name="slug" placeholder="ferreamigo" required />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="businessType">Tipo de negocio</Label>
+              <select
+                id="businessType"
+                name="businessType"
+                defaultValue="general"
+                className="h-10 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+              >
+                {BUSINESS_TYPE_KEYS.map((key) => (
+                  <option key={key} value={key}>
+                    {BUSINESS_TYPES[key].label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-brand-muted">
+                Define los íconos sugeridos al crear categorías.
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createSale } from "@/lib/actions/ventas-productos";
 import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
+import { WhatsappInvoiceButton } from "@/components/ventas-productos/whatsapp-invoice-button";
 import { searchClientes } from "@/lib/actions/clientes";
 import type { Cliente, PaymentInput, Product, TransferChannel } from "@/lib/supabase/types";
 
@@ -60,6 +61,7 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
   const [lastSaleId, setLastSaleId] = React.useState<string | null>(null);
+  const [lastSalePhone, setLastSalePhone] = React.useState<string | null>(null);
 
   const [customerMode, setCustomerMode] = React.useState<CustomerMode>("none");
   const [customerQuery, setCustomerQuery] = React.useState("");
@@ -73,6 +75,11 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
   });
 
   const [customerEmail, setCustomerEmail] = React.useState("");
+  // WhatsApp del consumidor final (no registrado) para enviarle la factura.
+  const [whatsapp, setWhatsapp] = React.useState("");
+  const [cashReceived, setCashReceived] = React.useState("");
+  // Última búsqueda terminada, para saber si el cliente escrito no existe.
+  const [searchedQuery, setSearchedQuery] = React.useState<string | null>(null);
   const [payMethod, setPayMethod] = React.useState<PayMethod>("efectivo");
   const [channel, setChannel] = React.useState<TransferChannel>("nequi");
   const [mixed, setMixed] = React.useState({ efectivo: "", nequi: "", daviplata: "", llave: "" });
@@ -90,6 +97,16 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
     (Number(mixed.daviplata) || 0) +
     (Number(mixed.llave) || 0);
   const mixedRemaining = total - mixedSum;
+  const cashReceivedNumber = Number(cashReceived) || 0;
+  const cashChange = cashReceivedNumber - total;
+
+  const trimmedQuery = customerQuery.trim();
+  const customerNotFound =
+    customerMode === "existing" &&
+    !selectedCustomer &&
+    trimmedQuery.length >= 2 &&
+    searchedQuery === trimmedQuery &&
+    customerResults.length === 0;
 
   React.useEffect(() => {
     if (customerMode !== "existing" || selectedCustomer) {
@@ -99,16 +116,31 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
     const trimmed = customerQuery.trim();
     if (trimmed.length < 2) {
       setCustomerResults([]);
+      setSearchedQuery(null);
       return;
     }
     const timeout = setTimeout(() => {
-      searchClientes(trimmed).then(({ results }) => setCustomerResults(results));
+      searchClientes(trimmed).then(({ results }) => {
+        setCustomerResults(results);
+        setSearchedQuery(trimmed);
+      });
     }, 300);
     return () => clearTimeout(timeout);
   }, [customerQuery, customerMode, selectedCustomer]);
 
+  // Si lo escrito no existe, se prepara el alta automática: lo que parece un
+  // documento (solo números) va a Documento y el resto a Nombre.
+  React.useEffect(() => {
+    if (!customerNotFound) return;
+    const looksLikeDocument = /^[\d.\s-]+$/.test(trimmedQuery);
+    setNewCustomer((c) =>
+      looksLikeDocument ? { ...c, documento: trimmedQuery } : { ...c, nombre: trimmedQuery }
+    );
+  }, [customerNotFound, trimmedQuery]);
+
   function selectCustomerMode(mode: CustomerMode) {
     setCustomerMode(mode);
+    setSearchedQuery(null);
     setSelectedCustomer(null);
     setCustomerQuery("");
     setCustomerResults([]);
@@ -156,7 +188,17 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
       return;
     }
     if (customerMode === "existing" && !selectedCustomer) {
-      setError("Selecciona un cliente de la lista, o cambia a Consumidor final / Cliente nuevo");
+      if (!customerNotFound) {
+        setError("Selecciona un cliente de la lista, o cambia a Consumidor final / Cliente nuevo");
+        return;
+      }
+      if (!newCustomer.nombre.trim()) {
+        setError("Ese cliente no existe: escribe su nombre para crearlo con la venta");
+        return;
+      }
+    }
+    if (payMethod === "efectivo" && cashReceivedNumber > 0 && cashChange < 0) {
+      setError(`El valor recibido es menor al total (faltan ${currency.format(-cashChange)})`);
       return;
     }
 
@@ -189,9 +231,21 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
     const customer =
       customerMode === "existing" && selectedCustomer
         ? { id: selectedCustomer.id }
-        : customerMode === "new"
+        : customerMode === "new" || customerNotFound
           ? { data: { ...newCustomer, email: customerEmail.trim() } }
           : undefined;
+
+    // Número al que se podrá enviar la factura por WhatsApp.
+    const salePhone =
+      customerMode === "existing" && selectedCustomer
+        ? selectedCustomer.telefono
+        : customerMode === "none"
+          ? whatsapp.trim()
+          : newCustomer.telefono.trim();
+    const changeText =
+      payMethod === "efectivo" && cashReceivedNumber > 0 && cashChange >= 0
+        ? ` · Devuelta: ${currency.format(cashChange)}`
+        : "";
 
     const result = await createSale(
       lines.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
@@ -206,10 +260,13 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
       return;
     }
 
-    setSuccess(`Venta registrada por ${currency.format(result.total ?? 0)}`);
+    setSuccess(`Venta registrada por ${currency.format(result.total ?? 0)}${changeText}`);
     setLastSaleId(result.saleId ?? null);
+    setLastSalePhone(salePhone || null);
     setCart({});
     setCustomerEmail("");
+    setWhatsapp("");
+    setCashReceived("");
     setPayMethod("efectivo");
     setChannel("nequi");
     setMixed({ efectivo: "", nequi: "", daviplata: "", llave: "" });
@@ -289,7 +346,16 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
               </p>
             )}
 
-            {customerMode !== "existing" && (
+            {customerMode === "none" && (
+              <Input
+                type="tel"
+                inputMode="tel"
+                placeholder="WhatsApp del cliente (opcional)"
+                value={whatsapp}
+                onChange={(event) => setWhatsapp(event.target.value)}
+              />
+            )}
+            {customerMode === "new" && (
               <Input
                 type="email"
                 placeholder="Correo del cliente (opcional)"
@@ -318,6 +384,36 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
                     value={customerQuery}
                     onChange={(event) => setCustomerQuery(event.target.value)}
                   />
+                  {customerNotFound && (
+                    <div className="mt-2 flex flex-col gap-2 rounded-[var(--radius-brand-sm)] border border-brand bg-brand/10 p-3">
+                      <p className="text-sm font-medium text-brand-ink">
+                        Este cliente no existe. Se creará automáticamente con la venta.
+                      </p>
+                      <Input
+                        placeholder="Nombre *"
+                        value={newCustomer.nombre}
+                        onChange={(event) =>
+                          setNewCustomer((c) => ({ ...c, nombre: event.target.value }))
+                        }
+                      />
+                      <Input
+                        placeholder="Documento (opcional)"
+                        value={newCustomer.documento}
+                        onChange={(event) =>
+                          setNewCustomer((c) => ({ ...c, documento: event.target.value }))
+                        }
+                      />
+                      <Input
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="Teléfono / WhatsApp (opcional)"
+                        value={newCustomer.telefono}
+                        onChange={(event) =>
+                          setNewCustomer((c) => ({ ...c, telefono: event.target.value }))
+                        }
+                      />
+                    </div>
+                  )}
                   {customerResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-[var(--radius-brand-sm)] border border-brand-border bg-white shadow-md">
                       {customerResults.map((c) => (
@@ -440,7 +536,10 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
                   <button
                     key={method}
                     type="button"
-                    onClick={() => setPayMethod(method)}
+                    onClick={() => {
+                      setPayMethod(method);
+                      setCashReceived("");
+                    }}
                     className={`flex-1 rounded-[var(--radius-brand-sm)] px-2 py-1 transition-colors ${
                       payMethod === method ? "bg-brand text-brand-ink" : "text-brand-muted"
                     }`}
@@ -449,6 +548,34 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
                   </button>
                 ))}
               </div>
+
+              {payMethod === "efectivo" && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 text-sm text-brand-muted">Recibido</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="1"
+                      inputMode="numeric"
+                      placeholder="¿Con cuánto paga?"
+                      value={cashReceived}
+                      onChange={(event) => setCashReceived(event.target.value)}
+                    />
+                  </div>
+                  {cashReceivedNumber > 0 && total > 0 && (
+                    <p
+                      className={`text-sm font-medium ${
+                        cashChange >= 0 ? "text-brand-success" : "text-brand-danger"
+                      }`}
+                    >
+                      {cashChange >= 0
+                        ? `Devuelta: ${currency.format(cashChange)}`
+                        : `Faltan ${currency.format(-cashChange)}`}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {payMethod === "transferencia" && (
                 <div className="flex gap-1 text-xs">
@@ -513,6 +640,7 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
             {success && lastSaleId && (
               <div className="flex flex-wrap items-center gap-2">
                 <DownloadInvoiceButton saleId={lastSaleId} size="sm" />
+                <WhatsappInvoiceButton saleId={lastSaleId} phone={lastSalePhone} size="sm" />
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/dashboard/ventas-productos/${lastSaleId}/factura`} target="_blank">
                     Ver factura

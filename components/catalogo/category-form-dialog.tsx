@@ -13,9 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { iconsForBusiness } from "@/lib/business-types";
 import type { Category } from "@/lib/supabase/types";
-
-const ICON_OPTIONS = ["🛠️", "🔩", "🪛", "🎨", "🧱", "🚰", "💡", "🧰", "📦", "🍞", "🥐", "🧁"];
 const COLOR_OPTIONS = [
   "#F59E0B",
   "#2563EB",
@@ -29,6 +28,8 @@ interface CategoryFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   category?: Category;
+  /** Tipo de negocio de la organización: define los íconos sugeridos. */
+  businessType?: string;
   action: (prev: { error?: string } | void, formData: FormData) => Promise<{ error?: string } | void>;
 }
 
@@ -36,8 +37,10 @@ export function CategoryFormDialog({
   open,
   onOpenChange,
   category,
+  businessType,
   action,
 }: CategoryFormDialogProps) {
+  const iconOptions = iconsForBusiness(businessType);
   const formRef = React.useRef<HTMLFormElement>(null);
 
   // Las acciones devuelven undefined al guardar con éxito; por eso se cierra
@@ -55,14 +58,15 @@ export function CategoryFormDialog({
   };
 
   const [state, formAction, pending] = useActionState(wrappedAction, undefined);
-  const [icon, setIcon] = React.useState(category?.icon ?? ICON_OPTIONS[0]);
+  const [icon, setIcon] = React.useState(category?.icon ?? iconOptions[0]);
   const [color, setColor] = React.useState(category?.color ?? COLOR_OPTIONS[0]);
 
   React.useEffect(() => {
     if (open) {
-      setIcon(category?.icon ?? ICON_OPTIONS[0]);
+      setIcon(category?.icon ?? iconOptions[0]);
       setColor(category?.color ?? COLOR_OPTIONS[0]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, category]);
 
 
@@ -84,7 +88,7 @@ export function CategoryFormDialog({
           <div className="flex flex-col gap-1.5">
             <Label>Ícono</Label>
             <div className="flex flex-wrap gap-2">
-              {ICON_OPTIONS.map((option) => (
+              {iconOptions.map((option) => (
                 <button
                   type="button"
                   key={option}
@@ -96,6 +100,18 @@ export function CategoryFormDialog({
                   {option}
                 </button>
               ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={icon}
+                onChange={(event) => setIcon(event.target.value.slice(0, 8))}
+                maxLength={8}
+                className="w-20 text-center text-lg"
+                aria-label="Ícono propio"
+              />
+              <p className="text-xs text-brand-muted">
+                O escribe/pega cualquier emoji (en Windows: tecla Windows + punto).
+              </p>
             </div>
           </div>
 

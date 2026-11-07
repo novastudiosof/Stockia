@@ -28,6 +28,8 @@ export type Organization = {
   invoice_prefix: string;
   next_sale_number: number;
   logo_url: string | null;
+  business_type: string;
+  theme_color: string | null;
   created_at: string;
 };
 

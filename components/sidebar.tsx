@@ -78,10 +78,10 @@ export function Sidebar({ fullName, roleLabel, items, logoUrl }: SidebarProps) {
           <img
             src={logoUrl}
             alt="Logo de tu negocio"
-            className="h-10 w-10 rounded-full bg-white object-contain"
+            className="h-16 w-16 rounded-xl bg-white object-contain p-1"
           />
         ) : (
-          <Image src="/brand/logo-icon.png" alt="Logo" width={40} height={40} className="rounded-lg" />
+          <Image src="/brand/logo-icon.png" alt="Logo" width={56} height={56} className="h-14 w-14 rounded-xl" />
         )}
         <div>
           <p className="text-sm font-semibold leading-tight">Stockia</p>
@@ -136,7 +136,7 @@ export function Sidebar({ fullName, roleLabel, items, logoUrl }: SidebarProps) {
             <img
               src={logoUrl}
               alt="Logo de tu negocio"
-              className="h-7 w-7 rounded-full bg-white object-contain"
+              className="h-10 w-10 rounded-lg bg-white object-contain p-0.5"
             />
           ) : (
             <Image src="/brand/logo-icon.png" alt="Logo" width={28} height={28} className="rounded-md" />

@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { voidSale, searchSales } from "@/lib/actions/ventas-productos";
 import { paymentLabel } from "@/lib/payments";
 import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
+import { WhatsappInvoiceButton } from "@/components/ventas-productos/whatsapp-invoice-button";
 import type { Sale } from "@/lib/supabase/types";
 
 const currency = new Intl.NumberFormat("es-CO", {
@@ -146,6 +147,11 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-brand-ink">{currency.format(sale.total)}</p>
                 <DownloadInvoiceButton saleId={sale.id} display="icon" />
+                <WhatsappInvoiceButton
+                  saleId={sale.id}
+                  display="icon"
+                  phone={sale.customer_snapshot?.telefono}
+                />
                 <Button variant="ghost" size="icon" asChild aria-label="Imprimir factura">
                   <Link href={`/dashboard/ventas-productos/${sale.id}/factura`} target="_blank">
                     <Printer className="h-4 w-4" />

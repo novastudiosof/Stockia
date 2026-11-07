@@ -16,6 +16,13 @@ export default async function CatalogoPage() {
     .eq("organization_id", profile.organization_id)
     .order("created_at", { ascending: true });
 
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("business_type")
+    .eq("id", profile.organization_id)
+    .single();
+  const businessType = org?.business_type ?? "general";
+
   const { data: products } = await supabase
     .from("products")
     .select("category_id")
@@ -39,7 +46,7 @@ export default async function CatalogoPage() {
           </p>
         </div>
         {canEdit && (
-          <AddCategoryButton />
+          <AddCategoryButton businessType={businessType} />
         )}
       </div>
 
@@ -57,6 +64,7 @@ export default async function CatalogoPage() {
               category={category}
               productCount={countsByCategory.get(category.id) ?? 0}
               canEdit={canEdit}
+              businessType={businessType}
             />
           ))}
         </div>

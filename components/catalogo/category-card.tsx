@@ -16,9 +16,10 @@ interface CategoryCardProps {
   category: Category;
   productCount: number;
   canEdit: boolean;
+  businessType?: string;
 }
 
-export function CategoryCard({ category, productCount, canEdit }: CategoryCardProps) {
+export function CategoryCard({ category, productCount, canEdit, businessType }: CategoryCardProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -84,6 +85,7 @@ export function CategoryCard({ category, productCount, canEdit }: CategoryCardPr
         open={editOpen}
         onOpenChange={setEditOpen}
         category={category}
+        businessType={businessType}
         action={boundUpdate}
       />
 

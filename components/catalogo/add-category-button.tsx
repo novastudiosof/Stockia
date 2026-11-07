@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CategoryFormDialog } from "@/components/catalogo/category-form-dialog";
 import { createCategory } from "@/lib/actions/catalogo";
 
-export function AddCategoryButton() {
+export function AddCategoryButton({ businessType }: { businessType?: string }) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -16,7 +16,12 @@ export function AddCategoryButton() {
         <Plus className="h-4 w-4" />
         Agregar categoría
       </Button>
-      <CategoryFormDialog open={open} onOpenChange={setOpen} action={createCategory} />
+      <CategoryFormDialog
+        open={open}
+        onOpenChange={setOpen}
+        businessType={businessType}
+        action={createCategory}
+      />
     </>
   );
 }

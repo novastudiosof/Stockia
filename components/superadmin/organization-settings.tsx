@@ -10,9 +10,12 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   updateMaxAuxiliares,
+  updateOrganizationAppearance,
   updateOrganizationLimits,
   toggleOrganizationActive,
 } from "@/lib/actions/superadmin";
+import { BUSINESS_TYPES, BUSINESS_TYPE_KEYS } from "@/lib/business-types";
+import { DEFAULT_THEME_COLOR, THEME_PRESETS, isHexColor } from "@/lib/theme";
 import type { Organization } from "@/lib/supabase/types";
 
 const CATEGORIA_STEPS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5); // 5..100
@@ -28,6 +31,32 @@ export function OrganizationSettings({ organization }: { organization: Organizat
   const [saving, setSaving] = React.useState(false);
   const [savingCatalogo, setSavingCatalogo] = React.useState(false);
   const [togglingActive, setTogglingActive] = React.useState(false);
+  const [businessType, setBusinessType] = React.useState(organization.business_type || "general");
+  const [themeColor, setThemeColor] = React.useState(
+    isHexColor(organization.theme_color) ? organization.theme_color : DEFAULT_THEME_COLOR
+  );
+  const [savingLook, setSavingLook] = React.useState(false);
+  const [lookError, setLookError] = React.useState<string | null>(null);
+
+  const savedColor = isHexColor(organization.theme_color)
+    ? organization.theme_color
+    : DEFAULT_THEME_COLOR;
+
+  async function handleSaveLook() {
+    setSavingLook(true);
+    setLookError(null);
+    const result = await updateOrganizationAppearance(
+      organization.id,
+      businessType,
+      themeColor.toLowerCase() === DEFAULT_THEME_COLOR.toLowerCase() ? null : themeColor
+    );
+    setSavingLook(false);
+    if (result.error) {
+      setLookError(result.error);
+      return;
+    }
+    router.refresh();
+  }
 
   async function handleSaveLimit() {
     setSaving(true);
@@ -68,6 +97,77 @@ export function OrganizationSettings({ organization }: { organization: Organizat
             disabled={togglingActive}
             onCheckedChange={handleToggleActive}
           />
+        </div>
+
+        <div className="flex flex-col gap-3 sm:max-w-sm">
+          <div>
+            <p className="font-medium text-brand-ink">Apariencia</p>
+            <p className="text-sm text-brand-muted">
+              El tipo de negocio define los íconos sugeridos en las categorías. El color se
+              aplica a toda la interfaz de esta organización.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="businessType">Tipo de negocio</Label>
+            <select
+              id="businessType"
+              className="h-9 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+              value={businessType}
+              onChange={(event) => setBusinessType(event.target.value)}
+            >
+              {BUSINESS_TYPE_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {BUSINESS_TYPES[key].label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="themeColor">Color de la página</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                id="themeColor"
+                type="color"
+                value={themeColor}
+                onChange={(event) => setThemeColor(event.target.value)}
+                className="h-9 w-12 cursor-pointer rounded border border-brand-border bg-white p-1"
+              />
+              {THEME_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  aria-label={`Usar color ${preset}`}
+                  onClick={() => setThemeColor(preset)}
+                  style={{ backgroundColor: preset }}
+                  className={`h-7 w-7 rounded-full border-2 ${
+                    themeColor.toLowerCase() === preset.toLowerCase()
+                      ? "border-brand-ink"
+                      : "border-transparent"
+                  }`}
+                />
+              ))}
+              <button
+                type="button"
+                className="text-xs text-brand-muted underline"
+                onClick={() => setThemeColor(DEFAULT_THEME_COLOR)}
+              >
+                Restablecer
+              </button>
+            </div>
+          </div>
+          {lookError && <p className="text-sm text-brand-danger">{lookError}</p>}
+          <Button
+            variant="outline"
+            className="self-start"
+            onClick={handleSaveLook}
+            disabled={
+              savingLook ||
+              (businessType === (organization.business_type || "general") &&
+                themeColor.toLowerCase() === savedColor.toLowerCase())
+            }
+          >
+            {savingLook ? "Guardando..." : "Guardar apariencia"}
+          </Button>
         </div>
 
         <div className="flex flex-col gap-1.5 sm:max-w-xs">
