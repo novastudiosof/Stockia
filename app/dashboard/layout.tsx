@@ -1,6 +1,5 @@
-import { requireProfile } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { getModulesWithStatus, MODULE_KEYS } from "@/lib/modules";
+import { getCurrentOrganization, requireProfile } from "@/lib/auth";
+import { getEnabledModuleKeys, MODULE_KEYS } from "@/lib/modules";
 import { Sidebar, type SidebarNavItem } from "@/components/sidebar";
 import { BrandFooter } from "@/components/brand-footer";
 import { darken, isHexColor } from "@/lib/theme";
@@ -20,29 +19,22 @@ export default async function DashboardLayout({
 
   const isSuperAdmin = profile.role === "super_admin";
 
-  const modules =
+  // Módulos y datos de la organización se piden a la vez (y la página reutiliza
+  // la misma consulta de módulos), en vez de uno detrás de otro.
+  const [enabledKeys, org] =
     profile.organization_id && !isSuperAdmin
-      ? await getModulesWithStatus(profile.organization_id)
-      : [];
+      ? await Promise.all([
+          getEnabledModuleKeys(profile.organization_id),
+          getCurrentOrganization(profile.organization_id),
+        ])
+      : [new Set<string>(), null];
 
-  let logoUrl: string | null = null;
-  let themeColor: string | null = null;
-  let orgName: string | null = null;
-  if (profile.organization_id && !isSuperAdmin) {
-    const supabase = await createClient();
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("*")
-      .eq("id", profile.organization_id)
-      .single();
-    logoUrl = org?.logo_url ?? null;
-    themeColor = isHexColor(org?.theme_color) ? org.theme_color : null;
-    // Razón social si está configurada; si no, el nombre del negocio.
-    orgName = org?.legal_name?.trim() || org?.name || null;
-  }
+  const logoUrl: string | null = org?.logo_url ?? null;
+  const themeColor: string | null = isHexColor(org?.theme_color) ? org.theme_color : null;
+  // Razón social si está configurada; si no, el nombre del negocio.
+  const orgName: string | null = org?.legal_name?.trim() || org?.name || null;
 
-  const isModuleEnabled = (key: string) =>
-    modules.find((m) => m.key === key)?.enabled ?? false;
+  const isModuleEnabled = (key: string) => enabledKeys.has(key);
 
   const items: SidebarNavItem[] = [];
 

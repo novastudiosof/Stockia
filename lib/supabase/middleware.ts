@@ -23,9 +23,11 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifica la firma del token aquí mismo (sin ir a Supabase en
+  // cada petición); la consulta del perfil de más abajo confirma que el usuario
+  // sigue existiendo y que su negocio sigue activo.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null;
 
   const { pathname } = request.nextUrl;
   // /factura/<token> es la factura compartida por WhatsApp: el token es un
@@ -47,11 +49,20 @@ export async function updateSession(request: NextRequest) {
   if (user && !isPublicPath) {
     // Una sola consulta: rol + estado del negocio (RLS deja leer la propia
     // organización). Si falla la consulta no se bloquea a nadie.
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role, organizations(is_active)")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
+
+    // Usuario eliminado (por ejemplo un auxiliar): su token firmado sigue
+    // siendo válido hasta que expire, así que sin perfil se le cierra la sesión.
+    if (!profile && !profileError) {
+      await supabase.auth.signOut();
+      const redirect = NextResponse.redirect(new URL("/login", request.url));
+      response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+      return redirect;
+    }
 
     const org = profile?.organizations as unknown as
       | { is_active: boolean }

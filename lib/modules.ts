@@ -46,31 +46,33 @@ export async function getModulesWithStatus(
   }));
 }
 
-// cache(): en una misma petición (layout + página + acción) se consulta una
-// sola vez por organización y módulo.
-export const isModuleEnabled = cache(async function isModuleEnabled(
-  organizationId: string,
-  key: ModuleKey
-): Promise<boolean> {
+type EnabledRow = { enabled: boolean; modules: { key: string } | { key: string }[] | null };
+
+/**
+ * Claves de los módulos habilitados de una organización, en UNA consulta.
+ * cache(): el layout y la página de una misma petición la comparten.
+ */
+export const getEnabledModuleKeys = cache(async function getEnabledModuleKeys(
+  organizationId: string
+): Promise<Set<string>> {
   const supabase = await createClient();
-
-  const { data: mod } = await supabase
-    .from("modules")
-    .select("id")
-    .eq("key", key)
-    .single();
-
-  if (!mod) return false;
-
-  const { data: orgModule } = await supabase
+  const { data } = await supabase
     .from("organization_modules")
-    .select("enabled")
+    .select("enabled, modules(key)")
     .eq("organization_id", organizationId)
-    .eq("module_id", mod.id)
-    .maybeSingle();
+    .eq("enabled", true);
 
-  return orgModule?.enabled ?? false;
+  const keys = new Set<string>();
+  for (const row of (data as unknown as EnabledRow[] | null) ?? []) {
+    const mod = Array.isArray(row.modules) ? row.modules[0] : row.modules;
+    if (row.enabled && mod?.key) keys.add(mod.key);
+  }
+  return keys;
 });
+
+export async function isModuleEnabled(organizationId: string, key: ModuleKey): Promise<boolean> {
+  return (await getEnabledModuleKeys(organizationId)).has(key);
+}
 
 /**
  * Corta la ejecución (server component o route handler) si el módulo no
