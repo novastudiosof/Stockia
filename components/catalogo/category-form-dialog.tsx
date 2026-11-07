@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { compressSquareImage } from "@/lib/image-compress";
 import { iconsForBusiness } from "@/lib/business-types";
 import type { Category } from "@/lib/supabase/types";
 const COLOR_OPTIONS = [
@@ -45,10 +46,44 @@ export function CategoryFormDialog({
 
   // Las acciones devuelven undefined al guardar con éxito; por eso se cierra
   // el diálogo aquí, al terminar la acción sin error (antes nunca se cerraba).
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+  const [removeImage, setRemoveImage] = React.useState(false);
+  const [imageError, setImageError] = React.useState<string | null>(null);
+  const [compressing, setCompressing] = React.useState(false);
+
+  async function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImageError(null);
+    setCompressing(true);
+    try {
+      const compressed = await compressSquareImage(file);
+      setImageFile(compressed);
+      setImagePreview(URL.createObjectURL(compressed));
+      setRemoveImage(false);
+    } catch {
+      setImageError("No se pudo leer esa imagen. Prueba con otra (JPG, PNG o WEBP).");
+    } finally {
+      setCompressing(false);
+    }
+  }
+
+  React.useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
   const wrappedAction = async (
     prev: { error?: string } | void,
     formData: FormData
   ) => {
+    // La foto ya viene reducida (~50 KB); se adjunta aquí, en el navegador.
+    if (imageFile) formData.set("image", imageFile);
+    else formData.delete("image");
+    if (removeImage) formData.set("removeImage", "1");
     const result = await action(prev, formData);
     if (!result?.error) {
       onOpenChange(false);
@@ -63,6 +98,10 @@ export function CategoryFormDialog({
 
   React.useEffect(() => {
     if (open) {
+      setImageFile(null);
+      setImagePreview(null);
+      setRemoveImage(false);
+      setImageError(null);
       setIcon(category?.icon ?? iconOptions[0]);
       setColor(category?.color ?? COLOR_OPTIONS[0]);
     }
@@ -83,6 +122,56 @@ export function CategoryFormDialog({
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="name">Nombre</Label>
             <Input id="name" name="name" defaultValue={category?.name} required />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Imagen (opcional)</Label>
+            <div className="flex items-center gap-3">
+              {(() => {
+                const shown = imagePreview ?? (removeImage ? null : category?.image_url ?? null);
+                return shown ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={shown}
+                    alt="Imagen de la categoría"
+                    className="h-16 w-16 rounded-[var(--radius-brand-sm)] border border-brand-border object-cover"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-brand-sm)] border border-dashed border-brand-border text-xs text-brand-muted">
+                    Sin imagen
+                  </div>
+                );
+              })()}
+              <div className="flex flex-col items-start gap-1">
+                <label className="cursor-pointer rounded-[var(--radius-brand-sm)] border border-brand-border px-3 py-1.5 text-sm hover:bg-black/5">
+                  {compressing ? "Procesando..." : "Elegir foto"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleImageChange}
+                    disabled={compressing}
+                  />
+                </label>
+                {(imagePreview || (category?.image_url && !removeImage)) && (
+                  <button
+                    type="button"
+                    className="text-xs text-brand-danger underline"
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreview(null);
+                      setRemoveImage(Boolean(category?.image_url));
+                    }}
+                  >
+                    Quitar imagen
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-brand-muted">
+              Se reduce sola a unos 50 KB. Si no hay imagen se usa el ícono y el color.
+            </p>
+            {imageError && <p className="text-xs text-brand-danger">{imageError}</p>}
           </div>
 
           <div className="flex flex-col gap-1.5">

@@ -45,7 +45,7 @@ export function CategoryCard({ category, productCount, canEdit, businessType }: 
     <>
       <Card className="group relative flex flex-col gap-3 p-4 transition-shadow hover:shadow-md">
         {canEdit && (
-          <div className="absolute right-2 top-2 z-10 flex gap-0.5">
+          <div className="absolute right-3 top-3 z-10 flex gap-0.5 rounded-[var(--radius-brand-sm)] bg-white/85 shadow-sm">
             <Button
               variant="ghost"
               size="icon"
@@ -66,12 +66,26 @@ export function CategoryCard({ category, productCount, canEdit, businessType }: 
         )}
 
         <Link href={`/dashboard/catalogo/${category.id}`} className="flex flex-col gap-3">
-          <div
-            className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-brand-md)] text-2xl"
-            style={{ backgroundColor: `${category.color}22` }}
-          >
-            {category.icon}
-          </div>
+          {category.image_url ? (
+            // Foto de la categoría: cuadrada, ocupa todo el ancho de la tarjeta.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={category.image_url}
+              alt={category.name}
+              width={512}
+              height={512}
+              loading="lazy"
+              decoding="async"
+              className="aspect-square w-full rounded-[var(--radius-brand-md)] object-cover"
+            />
+          ) : (
+            <div
+              className="flex aspect-square w-full items-center justify-center rounded-[var(--radius-brand-md)] text-5xl"
+              style={{ backgroundColor: `${category.color}22` }}
+            >
+              {category.icon}
+            </div>
+          )}
           <div>
             <p className="font-medium text-brand-ink">{category.name}</p>
             <p className="text-sm text-brand-muted">

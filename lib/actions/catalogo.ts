@@ -7,6 +7,11 @@ import { requireProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase/server";
 import { friendlyDbError } from "@/lib/db-errors";
+import {
+  removeCategoryImage,
+  uploadCategoryImage,
+  validateCategoryImage,
+} from "@/lib/category-image";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import {
   categorySchema,
@@ -34,6 +39,10 @@ export async function createCategory(
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
+  const image = formData.get("image") as File | null;
+  const imageError = validateCategoryImage(image);
+  if (imageError) return { error: imageError };
+
   const supabase = await createClient();
 
   const [{ data: org }, { count }] = await Promise.all([
@@ -51,13 +60,24 @@ export async function createCategory(
     return { error: `Alcanzaste el máximo de ${org.max_categorias} categorías de tu plan` };
   }
 
+  let imageUrl: string | null = null;
+  if (image && image.size > 0) {
+    const uploaded = await uploadCategoryImage(supabase, profile.organization_id, image);
+    if ("error" in uploaded) return { error: uploaded.error };
+    imageUrl = uploaded.url;
+  }
+
   const { error } = await supabase.from("categories").insert({
     organization_id: profile.organization_id,
     name: parsed.data.name,
     icon: parsed.data.icon,
     color: parsed.data.color,
+    image_url: imageUrl,
   });
-  if (error) return { error: friendlyDbError(error, "createCategory", "No se pudo crear la categoría") };
+  if (error) {
+    await removeCategoryImage(supabase, imageUrl);
+    return { error: friendlyDbError(error, "createCategory", "No se pudo crear la categoría") };
+  }
 
   await logActivity(profile, "Creó categoría", parsed.data.name);
   revalidatePath("/dashboard/catalogo");
@@ -78,12 +98,40 @@ export async function updateCategory(
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
+  const image = formData.get("image") as File | null;
+  const imageError = validateCategoryImage(image);
+  if (imageError) return { error: imageError };
+  const removeImage = formData.get("removeImage") === "1";
+
   const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("categories")
+    .select("image_url")
+    .eq("id", categoryId)
+    .single();
+
+  // Imagen nueva: se sube con nombre único; la anterior se borra al final.
+  let imageUpdate: { image_url: string | null } | Record<string, never> = {};
+  if (image && image.size > 0) {
+    if (!profile.organization_id) return { error: "Sin organización asociada" };
+    const uploaded = await uploadCategoryImage(supabase, profile.organization_id, image);
+    if ("error" in uploaded) return { error: uploaded.error };
+    imageUpdate = { image_url: uploaded.url };
+  } else if (removeImage) {
+    imageUpdate = { image_url: null };
+  }
+
   const { error } = await supabase
     .from("categories")
-    .update(parsed.data)
+    .update({ ...parsed.data, ...imageUpdate })
     .eq("id", categoryId);
-  if (error) return { error: friendlyDbError(error, "updateCategory", "No se pudo actualizar la categoría") };
+  if (error) {
+    if ("image_url" in imageUpdate && imageUpdate.image_url) {
+      await removeCategoryImage(supabase, imageUpdate.image_url);
+    }
+    return { error: friendlyDbError(error, "updateCategory", "No se pudo actualizar la categoría") };
+  }
+  if ("image_url" in imageUpdate) await removeCategoryImage(supabase, current?.image_url);
 
   await logActivity(profile, "Editó categoría", parsed.data.name);
   revalidatePath("/dashboard/catalogo");
@@ -94,8 +142,15 @@ export async function deleteCategory(categoryId: string, categoryName: string) {
   if (profile.role !== "owner") return { error: "Solo el administrador puede eliminar categorías" };
   const supabase = await createClient();
 
+  const { data: current } = await supabase
+    .from("categories")
+    .select("image_url")
+    .eq("id", categoryId)
+    .single();
+
   const { error } = await supabase.from("categories").delete().eq("id", categoryId);
   if (error) return { error: friendlyDbError(error, "deleteCategory", "No se pudo eliminar la categoría") };
+  await removeCategoryImage(supabase, current?.image_url);
 
   await logActivity(profile, "Eliminó categoría", categoryName);
   revalidatePath("/dashboard/catalogo");
