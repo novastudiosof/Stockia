@@ -1,6 +1,8 @@
 import ExcelJS from "exceljs";
 
 import { requireProfile } from "@/lib/auth";
+import { dayEnd, dayStart, isDay } from "@/lib/dates";
+import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import { paymentLabel } from "@/lib/payments";
 import { isModuleEnabled, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +22,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get("from") || "";
   const to = searchParams.get("to") || "";
+  const term = sanitizeOrFilterTerm((searchParams.get("q") || "").trim()).slice(0, 80);
 
   const supabase = await createClient();
   let query = supabase
@@ -29,8 +32,20 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: true })
     .limit(10000);
 
-  if (from) query = query.gte("created_at", from);
-  if (to) query = query.lte("created_at", `${to}T23:59:59`);
+  // Mismos filtros que la vista previa de Informes; los días son hora de Colombia.
+  if (isDay(from)) query = query.gte("created_at", dayStart(from));
+  if (isDay(to)) query = query.lte("created_at", dayEnd(to));
+  if (term) {
+    const clauses = [
+      `customer_snapshot->>nombre.ilike.*${term}*`,
+      `customer_snapshot->>documento.ilike.*${term}*`,
+    ];
+    const asNumber = Number(term);
+    if (Number.isInteger(asNumber) && asNumber > 0 && asNumber < 2_000_000_000) {
+      clauses.push(`sale_number.eq.${asNumber}`);
+    }
+    query = query.or(clauses.join(","));
+  }
 
   const { data } = await query;
   const sales = (data as Sale[]) ?? [];

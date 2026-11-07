@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { VentasReportCard } from "@/components/informes/ventas-report-card";
 import { VentasProductosReportCard } from "@/components/informes/ventas-productos-report-card";
 import { InventarioReportCard } from "@/components/informes/inventario-report-card";
+import { UtilidadReportCard } from "@/components/informes/utilidad-report-card";
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -27,11 +28,12 @@ export default async function InformesPage() {
       <div>
         <h1 className="text-2xl font-semibold text-brand-ink">Informes</h1>
         <p className="text-sm text-brand-muted">
-          Descarga reportes en Excel de tu negocio.
+          Consulta, calcula la utilidad y descarga reportes de tu negocio.
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <UtilidadReportCard />
         <VentasReportCard />
         <VentasProductosReportCard />
         <InventarioReportCard

@@ -166,6 +166,33 @@ export type SaleItem = {
   unitPrice: number;
   quantity: number;
   subtotal: number;
+  /** Precio de compra al vender (lo agrega un trigger; ventas viejas: estimado). */
+  unitCost?: number;
+};
+
+export type ProfitSummary = {
+  sales_count: number;
+  revenue: number;
+  cost: number;
+  gross_profit: number;
+  manual_sales: number;
+  expenses: number;
+};
+
+export type ProfitByProduct = {
+  product_id: string;
+  name: string;
+  units: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+};
+
+export type ProfitByPeriod = {
+  period: string;
+  revenue: number;
+  cost: number;
+  profit: number;
 };
 
 export type Sale = {
@@ -419,6 +446,18 @@ export type Database = {
           p_reason: string;
         };
         Returns: number;
+      };
+      profit_summary: {
+        Args: { p_from: string; p_to: string };
+        Returns: ProfitSummary[];
+      };
+      profit_by_product: {
+        Args: { p_from: string; p_to: string; p_limit?: number };
+        Returns: ProfitByProduct[];
+      };
+      profit_by_period: {
+        Args: { p_from: string; p_to: string; p_group?: "day" | "month" };
+        Returns: ProfitByPeriod[];
       };
       bulk_import_products: {
         Args: {
