@@ -27,6 +27,7 @@ export default async function DashboardLayout({
 
   let logoUrl: string | null = null;
   let themeColor: string | null = null;
+  let orgName: string | null = null;
   if (profile.organization_id && !isSuperAdmin) {
     const supabase = await createClient();
     const { data: org } = await supabase
@@ -36,6 +37,8 @@ export default async function DashboardLayout({
       .single();
     logoUrl = org?.logo_url ?? null;
     themeColor = isHexColor(org?.theme_color) ? org.theme_color : null;
+    // Razón social si está configurada; si no, el nombre del negocio.
+    orgName = org?.legal_name?.trim() || org?.name || null;
   }
 
   const isModuleEnabled = (key: string) =>
@@ -111,6 +114,7 @@ export default async function DashboardLayout({
         roleLabel={ROLE_LABELS[profile.role] ?? profile.role}
         items={items}
         logoUrl={logoUrl}
+        orgName={orgName}
       />
       <main className="flex min-w-0 flex-1 flex-col px-4 py-6 pt-20 md:px-8 md:py-8 md:pt-8">
         <div className="mx-auto w-full max-w-6xl flex-1">{children}</div>

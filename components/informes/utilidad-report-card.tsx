@@ -85,10 +85,9 @@ export function UtilidadReportCard() {
   return (
     <Card className="lg:col-span-2">
       <CardHeader>
-        <CardTitle>Utilidad</CardTitle>
+        <CardTitle>Utilidad (ganancia)</CardTitle>
         <CardDescription>
-          Ganancia de las ventas por productos (precio de venta menos costo de compra), más ventas
-          manuales y menos gastos del rango.
+          Cuánto ganaste: lo que vendiste menos lo que te costó comprarlo. Los gastos se ven aparte.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -103,7 +102,7 @@ export function UtilidadReportCard() {
           </div>
           <Button type="button" onClick={handleCalculate} disabled={loading || !from || !to}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
-            Calcular utilidad
+            Calcular ganancia
           </Button>
         </div>
 
@@ -111,24 +110,32 @@ export function UtilidadReportCard() {
 
         {report && s && (
           <>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Kpi label="Ventas (sin anuladas)" value={currency.format(s.revenue)} hint={`${s.sales_count} ventas`} />
-              <Kpi label="Costo de lo vendido" value={currency.format(s.cost)} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Kpi label="Vendido (sin anuladas)" value={currency.format(s.revenue)} hint={`${s.sales_count} ventas`} />
+              <Kpi label="Costo de compra de lo vendido" value={currency.format(s.cost)} />
               <Kpi
-                label="Utilidad de productos"
+                label="Ganancia"
                 value={currency.format(s.gross_profit)}
                 tone={s.gross_profit >= 0 ? "good" : "bad"}
-                hint={`Margen ${margin.toFixed(1)}%`}
-              />
-              <Kpi label="Ventas manuales" value={currency.format(s.manual_sales)} />
-              <Kpi label="Gastos" value={currency.format(s.expenses)} />
-              <Kpi
-                label="Utilidad neta"
-                value={currency.format(net)}
-                tone={net >= 0 ? "good" : "bad"}
-                hint="Productos + manuales − gastos"
+                hint={`Vendido − costo · margen ${margin.toFixed(1)}%`}
               />
             </div>
+
+            <details className="rounded-[var(--radius-brand-sm)] border border-brand-border p-3 text-sm">
+              <summary className="cursor-pointer font-medium text-brand-ink">
+                ¿Y si descuento gastos? (ganancia después de gastos)
+              </summary>
+              <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Kpi label="Ganancia de productos" value={currency.format(s.gross_profit)} />
+                <Kpi label="Ventas manuales" value={currency.format(s.manual_sales)} />
+                <Kpi label="Gastos" value={currency.format(s.expenses)} />
+                <Kpi
+                  label="Ganancia después de gastos"
+                  value={currency.format(net)}
+                  tone={net >= 0 ? "good" : "bad"}
+                />
+              </div>
+            </details>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>

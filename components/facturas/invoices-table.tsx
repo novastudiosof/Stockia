@@ -1,20 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { Download, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Download, Eye, Search } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { InvoiceFormDialog } from "@/components/facturas/invoice-form-dialog";
-import {
-  createInvoice,
-  updateInvoice,
-  deleteInvoice,
-  getInvoiceFileUrl,
-} from "@/lib/actions/facturas";
-import type { Invoice } from "@/lib/supabase/types";
+import { getInvoiceFileUrl } from "@/lib/actions/facturas";
 
 const currency = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -22,70 +14,95 @@ const currency = new Intl.NumberFormat("es-CO", {
   maximumFractionDigits: 0,
 });
 
-interface InvoicesTableProps {
-  invoices: Invoice[];
-  canEdit: boolean;
+/** Una factura/soporte: puede venir de un gasto con adjunto o ser una factura antigua. */
+export interface InvoiceRow {
+  id: string;
+  source: "gasto" | "factura";
+  title: string;
+  subtitle: string;
+  date: string;
+  amount: number;
+  filePath: string | null;
 }
 
-export function InvoicesTable({ invoices, canEdit }: InvoicesTableProps) {
-  const router = useRouter();
+export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
   const [search, setSearch] = React.useState("");
-  const [addOpen, setAddOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<Invoice | null>(null);
-  const [deleting, setDeleting] = React.useState<Invoice | null>(null);
-  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+  const [busyId, setBusyId] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const filtered = invoices.filter(
-    (invoice) =>
-      invoice.provider.toLowerCase().includes(search.toLowerCase()) ||
-      invoice.invoice_number.toLowerCase().includes(search.toLowerCase())
+  const term = search.trim().toLowerCase();
+  const filtered = rows.filter(
+    (row) =>
+      (!term ||
+        row.title.toLowerCase().includes(term) ||
+        row.subtitle.toLowerCase().includes(term)) &&
+      (!from || row.date >= from) &&
+      (!to || row.date <= to)
   );
 
-  const boundUpdate = editing
-    ? updateInvoice.bind(null, editing.id, editing.file_path)
-    : undefined;
-
-  async function handleDelete() {
-    if (!deleting) return;
-    setIsDeleting(true);
-    await deleteInvoice(deleting.id, deleting.file_path, deleting.provider);
-    setIsDeleting(false);
-    setDeleting(null);
-    router.refresh();
-  }
-
-  async function handleOpenFile(filePath: string) {
-    const url = await getInvoiceFileUrl(filePath);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  async function handleFile(row: InvoiceRow, download: boolean) {
+    if (!row.filePath) return;
+    setBusyId(row.id);
+    setError(null);
+    const url = await getInvoiceFileUrl(row.filePath, download);
+    setBusyId(null);
+    if (!url) {
+      setError("No se pudo abrir el archivo");
+      return;
+    }
+    if (download) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
           <Input
-            placeholder="Buscar por proveedor o número..."
+            placeholder="Buscar por proveedor, concepto o número..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="pl-9"
           />
         </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Agregar factura
-        </Button>
+        <Input
+          type="date"
+          aria-label="Desde"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          className="w-auto"
+        />
+        <Input
+          type="date"
+          aria-label="Hasta"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          className="w-auto"
+        />
       </div>
+
+      {error && <p className="text-sm text-brand-danger">{error}</p>}
 
       <div className="overflow-x-auto rounded-[var(--radius-brand-md)] border border-brand-border bg-white">
         <table className="table-stack w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-brand-border text-left text-brand-muted">
-              <th className="p-3 font-medium">Proveedor</th>
-              <th className="p-3 font-medium">N° factura</th>
               <th className="p-3 font-medium">Fecha</th>
+              <th className="p-3 font-medium">Detalle</th>
+              <th className="p-3 font-medium">Origen</th>
               <th className="p-3 font-medium">Monto</th>
-              <th className="p-3 font-medium text-right">Acciones</th>
+              <th className="p-3 font-medium text-right">Archivo</th>
             </tr>
           </thead>
           <tbody>
@@ -96,34 +113,39 @@ export function InvoicesTable({ invoices, canEdit }: InvoicesTableProps) {
                 </td>
               </tr>
             )}
-            {filtered.map((invoice) => (
-              <tr key={invoice.id} className="border-b border-brand-border last:border-0">
-                <td data-label="Proveedor" className="p-3 font-medium text-brand-ink">{invoice.provider}</td>
-                <td data-label="N° factura" className="p-3">{invoice.invoice_number}</td>
-                <td data-label="Fecha" className="p-3">{invoice.occurred_at}</td>
-                <td data-label="Monto" className="p-3">{currency.format(invoice.amount)}</td>
+            {filtered.map((row) => (
+              <tr key={`${row.source}-${row.id}`} className="border-b border-brand-border last:border-0">
+                <td data-label="Fecha" className="p-3">{row.date}</td>
+                <td data-label="Detalle" className="p-3">
+                  <p className="font-medium text-brand-ink">{row.title}</p>
+                  {row.subtitle && <p className="text-xs text-brand-muted">{row.subtitle}</p>}
+                </td>
+                <td data-label="Origen" className="p-3">
+                  <Badge variant={row.source === "gasto" ? "danger" : "muted"}>
+                    {row.source === "gasto" ? "Gasto" : "Factura"}
+                  </Badge>
+                </td>
+                <td data-label="Monto" className="p-3">{currency.format(row.amount)}</td>
                 <td data-label="" className="p-3">
                   <div className="flex justify-end gap-1">
-                    {invoice.file_path && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenFile(invoice.file_path!)}
-                        aria-label="Ver adjunto"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {canEdit && (
-                      <>
-                        <Button variant="ghost" size="icon" onClick={() => setEditing(invoice)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleting(invoice)}>
-                          <Trash2 className="h-4 w-4 text-brand-danger" />
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={busyId === row.id}
+                      onClick={() => handleFile(row, false)}
+                      aria-label="Ver archivo"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={busyId === row.id}
+                      onClick={() => handleFile(row, true)}
+                      aria-label="Descargar archivo"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -131,33 +153,6 @@ export function InvoicesTable({ invoices, canEdit }: InvoicesTableProps) {
           </tbody>
         </table>
       </div>
-
-      <InvoiceFormDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        action={createInvoice}
-        warnNoEdit={!canEdit}
-      />
-
-      {canEdit && editing && boundUpdate && (
-        <InvoiceFormDialog
-          open={!!editing}
-          onOpenChange={(open) => !open && setEditing(null)}
-          invoice={editing}
-          action={boundUpdate}
-        />
-      )}
-
-      {canEdit && (
-        <ConfirmDialog
-          open={!!deleting}
-          onOpenChange={(open) => !open && setDeleting(null)}
-          title="Eliminar factura"
-          description={`¿Deseas eliminar la factura de "${deleting?.provider}"? Esta acción no se puede deshacer.`}
-          isLoading={isDeleting}
-          onConfirm={handleDelete}
-        />
-      )}
     </div>
   );
 }

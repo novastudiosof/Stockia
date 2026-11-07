@@ -167,7 +167,7 @@ begin
   select
     (i->>'productId')::uuid,
     max(i->>'name'),
-    sum((i->>'quantity')::bigint),
+    sum((i->>'quantity')::bigint)::bigint,
     sum((i->>'subtotal')::numeric),
     sum((i->>'quantity')::numeric * coalesce((i->>'unitCost')::numeric, 0)),
     sum((i->>'subtotal')::numeric)

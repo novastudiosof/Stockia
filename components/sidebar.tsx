@@ -57,9 +57,11 @@ interface SidebarProps {
   roleLabel: string;
   items: SidebarNavItem[];
   logoUrl?: string | null;
+  /** Razón social (o nombre) de la organización; null para el super admin. */
+  orgName?: string | null;
 }
 
-export function Sidebar({ fullName, roleLabel, items, logoUrl }: SidebarProps) {
+export function Sidebar({ fullName, roleLabel, items, logoUrl, orgName }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -77,15 +79,27 @@ export function Sidebar({ fullName, roleLabel, items, logoUrl }: SidebarProps) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={logoUrl}
-            alt="Logo de tu negocio"
-            className="h-16 w-16 rounded-xl bg-white object-contain p-1"
+            alt={orgName ? `Logo de ${orgName}` : "Logo de tu negocio"}
+            className="h-[72px] w-[72px] shrink-0 rounded-xl bg-white object-cover"
           />
         ) : (
-          <Image src="/brand/logo-icon.png" alt="Logo" width={56} height={56} className="h-14 w-14 rounded-xl" />
+          <Image
+            src="/brand/logo-icon.png"
+            alt="Logo"
+            width={72}
+            height={72}
+            className="h-[72px] w-[72px] shrink-0 rounded-xl"
+          />
         )}
-        <div>
-          <p className="text-sm font-semibold leading-tight">Stockia</p>
-          <p className="text-xs text-white/60">{roleLabel}</p>
+        <div className="min-w-0 flex-1">
+          {orgName ? (
+            <p className="brand-title line-clamp-3 text-[clamp(1.05rem,1.2vw+0.7rem,1.45rem)]">
+              {orgName}
+            </p>
+          ) : (
+            <p className="text-sm font-semibold leading-tight">Stockia</p>
+          )}
+          <p className="mt-1 text-xs text-white/60">{roleLabel}</p>
         </div>
       </div>
 
@@ -129,20 +143,26 @@ export function Sidebar({ fullName, roleLabel, items, logoUrl }: SidebarProps) {
 
   return (
     <>
-      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between bg-brand-ink px-4 py-3 text-white md:hidden">
-        <div className="flex items-center gap-2">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt="Logo de tu negocio"
-              className="h-10 w-10 rounded-lg bg-white object-contain p-0.5"
-            />
-          ) : (
-            <Image src="/brand/logo-icon.png" alt="Logo" width={28} height={28} className="rounded-md" />
-          )}
-          <span className="text-sm font-semibold">Stockia</span>
-        </div>
+      <div className="fixed inset-x-0 top-0 z-40 grid grid-cols-[auto_1fr_auto] items-center gap-3 bg-brand-ink px-4 py-2 text-white md:hidden">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt={orgName ? `Logo de ${orgName}` : "Logo de tu negocio"}
+            className="h-11 w-11 rounded-lg bg-white object-cover"
+          />
+        ) : (
+          <Image src="/brand/logo-icon.png" alt="Logo" width={44} height={44} className="h-11 w-11 rounded-lg" />
+        )}
+        <p
+          className={
+            orgName
+              ? "brand-title line-clamp-2 text-center text-[clamp(0.95rem,4vw,1.3rem)]"
+              : "text-center text-sm font-semibold"
+          }
+        >
+          {orgName ?? "Stockia"}
+        </p>
         <button onClick={() => setOpen(true)} aria-label="Abrir menú">
           <Menu className="h-6 w-6" />
         </button>

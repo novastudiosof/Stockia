@@ -22,7 +22,8 @@ panel de super administrador.
    `014_pagos_conceptos_cierre_caja.sql`,
    `015_seguridad_tipo_negocio_color.sql`,
    `016_informes_utilidad.sql`,
-   `017_feed_ventas_gastos_enlace_factura.sql`.
+   `017_feed_ventas_gastos_enlace_factura.sql`,
+   `018_corrige_profit_by_product.sql`.
 
 ## 2. Crear el primer super administrador
 

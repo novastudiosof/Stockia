@@ -257,3 +257,21 @@ body {
     animation: none !important;
   }
 }
+
+/* ==========================================================================
+   Nombre de la organización (razón social): letra de cartel en el color
+   principal de la organización, con sombra para que se lea sobre fondo oscuro.
+   Se adapta solo: el tamaño crece/encoge con la pantalla y el texto largo
+   baja de línea en vez de cortarse.
+   ========================================================================== */
+.brand-title {
+  font-family: var(--font-anton), Impact, "Arial Narrow", sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  color: var(--color-primary);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 14px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}

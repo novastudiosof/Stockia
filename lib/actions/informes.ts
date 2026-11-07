@@ -40,6 +40,22 @@ async function requireInformes() {
   return { profile, organizationId: profile.organization_id };
 }
 
+/**
+ * Mensaje amigable + código del error de Postgres entre corchetes (solo el
+ * código, nunca el texto interno) para poder diagnosticar desde el celular o
+ * la captura de pantalla sin abrir los logs. El detalle completo queda en el
+ * log del servidor.
+ */
+function reportError(
+  error: { code?: string; message?: string } | null,
+  context: string,
+  fallback: string,
+  overrides?: Record<string, string>
+): string {
+  const message = friendlyDbError(error, context, fallback, overrides);
+  return error?.code && error.code !== "P0001" ? `${message} [${error.code}]` : message;
+}
+
 /** Valor entre comillas dobles para filtros `.or()` de PostgREST. */
 function quote(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
@@ -125,7 +141,7 @@ export async function previewSales(
     return {
       rows: [],
       nextCursor: null,
-      error: friendlyDbError(error, "previewSales", "No se pudieron cargar las ventas"),
+      error: reportError(error, "previewSales", "No se pudieron cargar las ventas"),
     };
   }
 
@@ -194,7 +210,7 @@ export async function previewMovements(
     return {
       rows: [],
       nextCursor: null,
-      error: friendlyDbError(failure, "previewMovements", "No se pudieron cargar los movimientos", {
+      error: reportError(failure, "previewMovements", "No se pudieron cargar los movimientos", {
         PGRST202: MIGRATION_017,
         "42883": MIGRATION_017,
       }),
@@ -264,7 +280,7 @@ export async function previewInventory(
     return {
       rows: [],
       nextCursor: null,
-      error: friendlyDbError(error, "previewInventory", "No se pudo cargar el inventario"),
+      error: reportError(error, "previewInventory", "No se pudo cargar el inventario"),
     };
   }
 
@@ -324,7 +340,7 @@ export async function getProfitReport(
 
   const failure = summary.error ?? byProduct.error ?? byPeriod.error;
   if (failure || !summary.data) {
-    return { error: friendlyDbError(failure, "getProfitReport", "No se pudo calcular la utilidad", {
+    return { error: reportError(failure, "getProfitReport", "No se pudo calcular la utilidad", {
         PGRST202: "Falta ejecutar la migración 016 en Supabase",
         "42883": "Falta ejecutar la migración 016 en Supabase",
       }) };
