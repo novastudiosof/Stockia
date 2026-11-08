@@ -91,10 +91,11 @@ export type SalesPreviewRow = Pick<
   | "pay_llave"
   | "sold_by_name"
   | "voided_at"
+  | "void_kind"
 >;
 
 const SALES_COLUMNS =
-  "id, sale_number, created_at, customer_snapshot, total, payment_method, pay_cash, pay_nequi, pay_daviplata, pay_llave, sold_by_name, voided_at";
+  "id, sale_number, created_at, customer_snapshot, total, payment_method, pay_cash, pay_nequi, pay_daviplata, pay_llave, sold_by_name, voided_at, void_kind";
 
 export async function previewSales(
   filters: SalesPreviewFilters,

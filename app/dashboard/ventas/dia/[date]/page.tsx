@@ -45,23 +45,41 @@ export default async function DetalleDiaPage({
 
   const supabase = await createClient();
   // Colombia no tiene horario de verano: el día local es siempre UTC-5.
-  const { data } = await supabase
-    .from("sales")
-    .select("*")
-    .eq("organization_id", profile.organization_id)
-    .gte("created_at", `${date}T00:00:00-05:00`)
-    .lt("created_at", `${nextDay(date)}T00:00:00-05:00`)
-    .order("created_at", { ascending: true });
+  const [{ data }, { data: returnedData }] = await Promise.all([
+    supabase
+      .from("sales")
+      .select("*")
+      .eq("organization_id", profile.organization_id)
+      .gte("created_at", `${date}T00:00:00-05:00`)
+      .lt("created_at", `${nextDay(date)}T00:00:00-05:00`)
+      .order("created_at", { ascending: true }),
+    // Devoluciones hechas este día (de ventas de este día o de días anteriores).
+    supabase
+      .from("sales")
+      .select("*")
+      .eq("organization_id", profile.organization_id)
+      .eq("void_kind", "devolucion")
+      .gte("voided_at", `${date}T00:00:00-05:00`)
+      .lt("voided_at", `${nextDay(date)}T00:00:00-05:00`)
+      .order("voided_at", { ascending: true }),
+  ]);
 
   const sales = (data as Sale[]) ?? [];
-  const active = sales.filter((s) => !s.voided_at);
-  const total = active.reduce((sum, s) => sum + Number(s.total), 0);
+  const returnedToday = (returnedData as Sale[]) ?? [];
+  // Cuentan las ventas no anuladas (las devueltas siguen contando en su día);
+  // las devoluciones restan en el día en que se hicieron.
+  const active = sales.filter((s) => !s.voided_at || s.void_kind === "devolucion");
+  const annulledCount = sales.filter((s) => s.voided_at && s.void_kind !== "devolucion").length;
+  const returnsTotal = returnedToday.reduce((sum, s) => sum + Number(s.total), 0);
+  const total = active.reduce((sum, s) => sum + Number(s.total), 0) - returnsTotal;
+  const net = (pick: (s: Sale) => number) =>
+    active.reduce((sum, s) => sum + pick(s), 0) - returnedToday.reduce((sum, s) => sum + pick(s), 0);
   const byMethod = [
-    { label: "Efectivo", amount: active.reduce((sum, s) => sum + Number(s.pay_cash), 0) },
-    { label: "Nequi", amount: active.reduce((sum, s) => sum + Number(s.pay_nequi), 0) },
-    { label: "Daviplata", amount: active.reduce((sum, s) => sum + Number(s.pay_daviplata), 0) },
-    { label: "Llave", amount: active.reduce((sum, s) => sum + Number(s.pay_llave), 0) },
-  ].filter((m) => m.amount > 0);
+    { label: "Efectivo", amount: net((s) => Number(s.pay_cash)) },
+    { label: "Nequi", amount: net((s) => Number(s.pay_nequi)) },
+    { label: "Daviplata", amount: net((s) => Number(s.pay_daviplata)) },
+    { label: "Llave", amount: net((s) => Number(s.pay_llave)) },
+  ].filter((m) => m.amount !== 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -94,9 +112,14 @@ export default async function DetalleDiaPage({
           </CardHeader>
           <CardContent className="text-2xl font-semibold text-brand-ink">
             {active.length}
-            {sales.length !== active.length && (
+            {annulledCount > 0 && (
               <span className="ml-2 text-sm font-normal text-brand-muted">
-                ({sales.length - active.length} anuladas)
+                ({annulledCount} anuladas)
+              </span>
+            )}
+            {returnedToday.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-brand-muted">
+                ({returnedToday.length} devueltas hoy: − {currency.format(returnsTotal)})
               </span>
             )}
           </CardContent>
@@ -159,7 +182,7 @@ export default async function DetalleDiaPage({
                   {currency.format(sale.total)}
                   {sale.voided_at && (
                     <Badge variant="danger" className="ml-2">
-                      Anulada
+                      {sale.void_kind === "devolucion" ? "Devuelta" : "Anulada"}
                     </Badge>
                   )}
                 </td>

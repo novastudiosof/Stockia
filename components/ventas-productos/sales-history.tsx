@@ -241,7 +241,7 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
               <DialogTitle>Devolución de venta</DialogTitle>
               <DialogDescription>
                 Se devuelve la venta completa{returning ? ` por ${currency.format(returning.total)}` : ""} y
-                el stock de todos sus productos regresa al inventario. Si el cliente solo devuelve
+                el stock de todos sus productos regresa al inventario. El valor se descuenta de la caja y las ventas de HOY, por el mismo medio de pago con que se cobró; el día original de la venta no cambia. Si el cliente solo devuelve
                 algunos productos, registra la devolución y luego haz de nuevo la venta con los
                 productos que se queda.
               </DialogDescription>

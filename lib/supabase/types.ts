@@ -151,6 +151,10 @@ export type CashDay = {
   sales_nequi: number;
   sales_daviplata: number;
   sales_llave: number;
+  returns_cash: number;
+  returns_nequi: number;
+  returns_daviplata: number;
+  returns_llave: number;
   manual_sales: number;
   expenses: number;
   expected_cash: number;
@@ -275,6 +279,12 @@ export type CashDaySummary = {
   sales_llave: number;
   manual_sales: number;
   expenses: number;
+  returns_count: number;
+  returns_total: number;
+  returns_cash: number;
+  returns_nequi: number;
+  returns_daviplata: number;
+  returns_llave: number;
 };
 
 export type DailySales = { day: string; sales_count: number; total: number };
@@ -445,7 +455,7 @@ export type Database = {
         Returns: undefined;
       };
       void_sale: {
-        Args: { p_sale_id: string };
+        Args: { p_sale_id: string; p_kind?: string; p_reason?: string | null };
         Returns: undefined;
       };
       adjust_stock: {

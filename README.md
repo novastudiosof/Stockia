@@ -25,7 +25,8 @@ panel de super administrador.
    `017_feed_ventas_gastos_enlace_factura.sql`,
    `018_corrige_profit_by_product.sql`,
    `019_devoluciones.sql`,
-   `020_borradores_venta.sql`.
+   `020_borradores_venta.sql`,
+   `021_devoluciones_en_su_dia.sql`.
 
 ## 2. Crear el primer super administrador
 

@@ -4,7 +4,7 @@
 
 ## Hecho en código, sin commit ni probar (2026-11-08)
 - [ ] **Color de la página y Datos de facturación pasaron de Super Admin a Mi Cuenta** (solo administrador). Tipo de negocio sigue en Super Admin. Acciones `updateMyThemeColor` y `updateMyInvoiceSettings` en `lib/actions/cuenta.ts` (usan service role porque RLS de organizations es solo super admin).
-- [ ] **Devoluciones**: botón en el historial de Ventas por Productos (solo administrador). Devuelve la venta completa, regresa stock y la saca de informes. Si el cliente conserva productos, se registra de nuevo la venta con esos. **Correr migración 019 (`sql/019_devoluciones.sql`) antes de desplegar.** Excel, informes y detalle del día todavía rotulan "Anulada" aunque sea devolución.
+- [ ] **Devoluciones**: botón en el historial de Ventas por Productos (solo administrador). Devuelve la venta completa, regresa stock y la saca de informes. Si el cliente conserva productos, se registra de nuevo la venta con esos. **Correr migración 019 (`sql/019_devoluciones.sql`) antes de desplegar.** **Migración 021** (`sql/021_devoluciones_en_su_dia.sql`): la devolución se descuenta en el día en que se hace (caja, ventas del día, utilidad, por el mismo medio de pago), sin tocar el día original ni exigir reabrir su caja. Requiere la caja de HOY abierta. Las anulaciones siguen igual (solo antes del cierre del día de la venta). Probada en un Postgres en memoria; falta probar en producción: devolver una venta de hace días y revisar cierre de caja, Ventas y Gastos e Informes → Utilidad.
 - [ ] **Ventas en espera (borrador compartido)**: el carrito se guarda solo en la base (migración **020_borradores_venta.sql**, correr antes de desplegar). Cada venta tiene un responsable; todos ven quién la inició y quién la tiene, solo el responsable la edita; se puede pasar a otro usuario o el administrador la toma. Se borra al confirmar la venta y a los 3 días. Probar con dos usuarios a la vez.
 
 ## Por confirmar con el usuario (probar en producción)
@@ -44,4 +44,4 @@
 - Capacidad estimada (aprox.): venta ≈ 3 KB, producto ≈ 0,6 KB, gasto ≈ 0,6 KB. Gratis: ~7 años a 50 ventas/día; comprobantes agotan 1 GB en 3–12 meses con 5 al día. Pro: décadas.
 
 ## Migraciones SQL (orden)
-001–020. README.md lista hasta la 019 (agregar 020). Las migraciones se corren a mano en Supabase antes del despliegue.
+001–021. README.md lista hasta la 021. Las migraciones se corren a mano en Supabase antes del despliegue.

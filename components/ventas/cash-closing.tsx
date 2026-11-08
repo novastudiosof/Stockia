@@ -63,6 +63,10 @@ export function CashClosing({ day, today, cashDay, live, salesEnabled }: CashClo
         sales_llave: Number(cashDay.sales_llave),
         manual_sales: Number(cashDay.manual_sales),
         expenses: Number(cashDay.expenses),
+        returns_cash: Number(cashDay.returns_cash ?? 0),
+        returns_nequi: Number(cashDay.returns_nequi ?? 0),
+        returns_daviplata: Number(cashDay.returns_daviplata ?? 0),
+        returns_llave: Number(cashDay.returns_llave ?? 0),
       }
     : live;
 
@@ -84,7 +88,7 @@ export function CashClosing({ day, today, cashDay, live, salesEnabled }: CashClo
   const baseNumber = Number(base) || 0;
   const expected = closed && cashDay
     ? Number(cashDay.expected_cash)
-    : baseNumber + figures.sales_cash + figures.manual_sales - figures.expenses;
+    : baseNumber + figures.sales_cash - figures.returns_cash + figures.manual_sales - figures.expenses;
   const countedNumber = counted === "" ? null : Number(counted);
   const difference = closed && cashDay
     ? Number(cashDay.difference ?? 0)
@@ -92,6 +96,9 @@ export function CashClosing({ day, today, cashDay, live, salesEnabled }: CashClo
       ? null
       : countedNumber - expected;
   const transfers = figures.sales_nequi + figures.sales_daviplata + figures.sales_llave;
+  const transferReturns =
+    figures.returns_nequi + figures.returns_daviplata + figures.returns_llave;
+  const hasReturns = figures.returns_cash + transferReturns > 0;
 
   async function run(action: () => Promise<{ error?: string; success?: string }>) {
     setBusy(true);
@@ -175,9 +182,19 @@ export function CashClosing({ day, today, cashDay, live, salesEnabled }: CashClo
             {salesEnabled && (
               <Line label="Ventas en efectivo" value={figures.sales_cash} sign="+" />
             )}
+            {salesEnabled && figures.returns_cash > 0 && (
+              <Line label="Devoluciones en efectivo de hoy" value={figures.returns_cash} sign="-" />
+            )}
             <Line label="Ventas manuales (se cuentan como efectivo)" value={figures.manual_sales} sign="+" />
             <Line label="Gastos (se cuentan como efectivo)" value={figures.expenses} sign="-" />
             <Line label="Efectivo esperado en caja" value={expected} strong />
+            {salesEnabled && hasReturns && transferReturns > 0 && (
+              <p className="pt-3 text-xs text-brand-muted">
+                Devoluciones por transferencia (no salen del efectivo): {currency.format(transferReturns)}
+                {" "}(Nequi {currency.format(figures.returns_nequi)} · Daviplata{" "}
+                {currency.format(figures.returns_daviplata)} · Llave {currency.format(figures.returns_llave)})
+              </p>
+            )}
             {salesEnabled && (
               <div className="pt-3 text-xs text-brand-muted">
                 <p className="mb-1 font-medium text-brand-ink">

@@ -81,7 +81,11 @@ export async function GET(request: Request) {
       total: Number(sale.total),
       pago: paymentLabel(sale),
       vendedor: sale.sold_by_name || "",
-      estado: sale.voided_at ? "Anulada" : "Activa",
+      estado: sale.voided_at
+        ? sale.void_kind === "devolucion"
+          ? "Devuelta"
+          : "Anulada"
+        : "Activa",
     });
 
     if (sale.voided_at) {

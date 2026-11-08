@@ -97,7 +97,7 @@ const COLUMNS: PreviewColumn<SalesPreviewRow>[] = [
       s.voided_at ? (
         <span className="flex items-center gap-2">
           <span className="line-through">{currency.format(s.total)}</span>
-          <Badge variant="danger">Anulada</Badge>
+          <Badge variant="danger">{s.void_kind === "devolucion" ? "Devuelta" : "Anulada"}</Badge>
         </span>
       ) : (
         currency.format(s.total)

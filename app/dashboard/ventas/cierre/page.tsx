@@ -48,6 +48,12 @@ export default async function CierreCajaPage({
     sales_llave: 0,
     manual_sales: 0,
     expenses: 0,
+    returns_count: 0,
+    returns_total: 0,
+    returns_cash: 0,
+    returns_nequi: 0,
+    returns_daviplata: 0,
+    returns_llave: 0,
   };
 
   return (
@@ -79,6 +85,12 @@ export default async function CierreCajaPage({
           sales_llave: Number(live.sales_llave),
           manual_sales: Number(live.manual_sales),
           expenses: Number(live.expenses),
+          returns_count: Number(live.returns_count),
+          returns_total: Number(live.returns_total),
+          returns_cash: Number(live.returns_cash),
+          returns_nequi: Number(live.returns_nequi),
+          returns_daviplata: Number(live.returns_daviplata),
+          returns_llave: Number(live.returns_llave),
         }}
         salesEnabled={salesEnabled}
       />
