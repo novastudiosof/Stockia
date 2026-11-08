@@ -6,7 +6,15 @@ import { requireProfile, requireRole } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { changePasswordSchema, createAuxiliarSchema } from "@/lib/validations/cuenta";
+import { friendlyDbError } from "@/lib/db-errors";
+import {
+  ALLOWED_LOGO_MIME_TYPES,
+  MAX_LOGO_FILE_SIZE_MB,
+  changePasswordSchema,
+  createAuxiliarSchema,
+  invoiceSettingsSchema,
+  themeColorSchema,
+} from "@/lib/validations/cuenta";
 
 type ActionResult = { error?: string; success?: string } | void;
 
@@ -122,4 +130,102 @@ export async function deleteAuxiliar(auxiliarId: string, username: string) {
 
   await logActivity(profile, "Eliminó usuario auxiliar", username);
   revalidatePath("/dashboard/cuenta");
+}
+
+/**
+ * Datos de facturación y color de la página: los edita el administrador de
+ * cada negocio. La política RLS de organizations solo deja escribir al super
+ * admin, así que se usa la service role; la autorización se valida aquí
+ * (rol owner) y el id de la organización sale siempre del perfil, nunca del
+ * formulario.
+ */
+export async function updateMyInvoiceSettings(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await requireRole("owner");
+  const organizationId = profile.organization_id;
+  if (!organizationId) return { error: "Sin organización asociada" };
+
+  const parsed = invoiceSettingsSchema.safeParse({
+    legalName: formData.get("legalName") ?? "",
+    taxId: formData.get("taxId") ?? "",
+    billingAddress: formData.get("billingAddress") ?? "",
+    billingPhone: formData.get("billingPhone") ?? "",
+    billingEmail: formData.get("billingEmail") ?? "",
+    invoiceFooter: formData.get("invoiceFooter") ?? "",
+    currency: formData.get("currency") || "COP",
+    invoicePrefix: formData.get("invoicePrefix") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const admin = createAdminClient();
+
+  const file = formData.get("logo") as File | null;
+  let logoUrl: string | undefined;
+  if (file && file.size > 0) {
+    if (!ALLOWED_LOGO_MIME_TYPES.includes(file.type)) {
+      return { error: "El logo debe ser una imagen (PNG, JPG o WEBP)" };
+    }
+    if (file.size > MAX_LOGO_FILE_SIZE_MB * 1024 * 1024) {
+      return { error: `El logo no puede superar ${MAX_LOGO_FILE_SIZE_MB}MB` };
+    }
+    const path = `${organizationId}/logo-${crypto.randomUUID()}`;
+    const { error: uploadError } = await admin.storage
+      .from("branding")
+      .upload(path, file, { contentType: file.type, upsert: true });
+    if (uploadError) {
+      return { error: friendlyDbError(uploadError, "updateMyInvoiceSettings:upload", "No se pudo subir el logo") };
+    }
+    logoUrl = admin.storage.from("branding").getPublicUrl(path).data.publicUrl;
+  }
+
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      legal_name: parsed.data.legalName || null,
+      tax_id: parsed.data.taxId || null,
+      billing_address: parsed.data.billingAddress || null,
+      billing_phone: parsed.data.billingPhone || null,
+      billing_email: parsed.data.billingEmail || null,
+      invoice_footer: parsed.data.invoiceFooter || null,
+      currency: parsed.data.currency,
+      invoice_prefix: parsed.data.invoicePrefix || "",
+      ...(logoUrl ? { logo_url: logoUrl } : {}),
+    })
+    .eq("id", organizationId);
+  if (error) {
+    return { error: friendlyDbError(error, "updateMyInvoiceSettings", "No se pudieron guardar los datos de facturación") };
+  }
+
+  await logActivity(profile, "Actualizó datos de facturación", organizationId);
+  revalidatePath("/dashboard/cuenta");
+  revalidatePath("/dashboard", "layout");
+  return { success: "Datos de facturación guardados" };
+}
+
+export async function updateMyThemeColor(themeColor: string | null): Promise<{ error?: string }> {
+  const profile = await requireRole("owner");
+  if (!profile.organization_id) return { error: "Sin organización asociada" };
+
+  const parsed = themeColorSchema.safeParse(themeColor);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("organizations")
+    .update({ theme_color: parsed.data })
+    .eq("id", profile.organization_id);
+  if (error) {
+    return {
+      error: friendlyDbError(error, "updateMyThemeColor", "No se pudo guardar el color", {
+        PGRST204: "Falta ejecutar la migración 015 en Supabase",
+        "42703": "Falta ejecutar la migración 015 en Supabase",
+      }),
+    };
+  }
+
+  await logActivity(profile, "Cambió el color de la página", parsed.data ?? "color por defecto");
+  revalidatePath("/dashboard", "layout");
+  return {};
 }

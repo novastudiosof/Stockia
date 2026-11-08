@@ -8,12 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { updateInvoiceSettings } from "@/lib/actions/superadmin";
+import { updateMyInvoiceSettings } from "@/lib/actions/cuenta";
 import type { Organization } from "@/lib/supabase/types";
 
 export function InvoiceSettings({ organization }: { organization: Organization }) {
-  const boundAction = updateInvoiceSettings.bind(null, organization.id);
-  const [state, formAction, pending] = useActionState(boundAction, undefined);
+  const [state, formAction, pending] = useActionState(updateMyInvoiceSettings, undefined);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [preview, setPreview] = React.useState<string | null>(null);
   const [fileName, setFileName] = React.useState<string | null>(null);
@@ -35,7 +34,7 @@ export function InvoiceSettings({ organization }: { organization: Organization }
       <CardHeader>
         <CardTitle>Datos de facturación</CardTitle>
         <p className="text-sm text-brand-muted">
-          Aparecen en las facturas de venta que esta organización imprime desde &quot;Ventas por
+          Aparecen en las facturas de venta que imprime tu negocio desde &quot;Ventas por
           Productos&quot;.
         </p>
       </CardHeader>
@@ -152,6 +151,7 @@ export function InvoiceSettings({ organization }: { organization: Organization }
           </div>
 
           {state?.error && <p className="text-sm text-brand-danger">{state.error}</p>}
+          {state?.success && <p className="text-sm text-green-700">{state.success}</p>}
 
           <Button type="submit" disabled={pending} className="self-start">
             {pending ? "Guardando..." : "Guardar datos de facturación"}

@@ -67,19 +67,46 @@ export async function createSale(
   return { saleId: data.sale_id, total: data.total, saleNumber: data.sale_number };
 }
 
-export async function voidSale(saleId: string): Promise<ActionResult> {
+export async function voidSale(
+  saleId: string,
+  kind: "anulacion" | "devolucion" = "anulacion",
+  reason?: string
+): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
-  if (profile.role !== "owner") return { error: "Solo el administrador puede anular una venta" };
+  if (profile.role !== "owner") {
+    return { error: "Solo el administrador puede anular o devolver una venta" };
+  }
   await requireModule(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("void_sale", { p_sale_id: saleId });
-  if (error) return { error: friendlyDbError(error, "voidSale", "No se pudo anular la venta") };
+  const cleanReason = (reason ?? "").trim().slice(0, 200);
+  const isReturn = kind === "devolucion";
 
-  await logActivity(profile, "Anuló venta de productos", saleId);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("void_sale", {
+    p_sale_id: saleId,
+    p_kind: kind,
+    p_reason: cleanReason || null,
+  });
+  if (error) {
+    return {
+      error: friendlyDbError(
+        error,
+        "voidSale",
+        isReturn ? "No se pudo registrar la devolución" : "No se pudo anular la venta",
+        { PGRST202: "Falta ejecutar la migración 019 en Supabase" }
+      ),
+    };
+  }
+
+  await logActivity(
+    profile,
+    isReturn ? "Registró devolución de venta" : "Anuló venta de productos",
+    cleanReason ? `${saleId} · ${cleanReason}` : saleId
+  );
   revalidatePath("/dashboard/ventas-productos");
   revalidatePath("/dashboard/catalogo");
+  revalidatePath("/dashboard/ventas");
   return {};
 }
 

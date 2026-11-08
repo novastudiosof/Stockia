@@ -204,6 +204,8 @@ export type Sale = {
   created_at: string;
   voided_at: string | null;
   voided_by: string | null;
+  void_kind: "anulacion" | "devolucion" | null;
+  void_reason: string | null;
   customer_id: string | null;
   customer_snapshot: CustomerSnapshot | null;
   sale_number: number | null;
@@ -382,6 +384,12 @@ export type Database = {
         Update: Partial<CashDay>;
         Relationships: [];
       };
+      sale_drafts: {
+        Row: SaleDraft;
+        Insert: Partial<SaleDraft> & Pick<SaleDraft, "organization_id" | "state">;
+        Update: Partial<SaleDraft>;
+        Relationships: [];
+      };
       stock_movements: {
         Row: StockMovement;
         Insert: Partial<StockMovement> &
@@ -494,4 +502,30 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
+};
+
+export type SaleDraftState = {
+  lines: { productId: string; quantity: number }[];
+  customerMode: "none" | "existing" | "new";
+  selectedCustomer: Cliente | null;
+  newCustomer: { nombre: string; documento: string; telefono: string; direccion: string };
+  customerEmail: string;
+  whatsapp: string;
+  cashReceived: string;
+  payMethod: "efectivo" | "transferencia" | "mixto";
+  channel: TransferChannel;
+  mixed: { efectivo: string; nequi: string; daviplata: string; llave: string };
+};
+
+export type SaleDraft = {
+  id: string;
+  organization_id: string;
+  state: SaleDraftState;
+  total: number;
+  created_by: string | null;
+  created_by_name: string | null;
+  assigned_to: string | null;
+  assigned_to_name: string | null;
+  created_at: string;
+  updated_at: string;
 };

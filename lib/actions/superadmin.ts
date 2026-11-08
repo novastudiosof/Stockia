@@ -11,9 +11,6 @@ import { friendlyDbError } from "@/lib/db-errors";
 import {
   appearanceSchema,
   createOrganizationSchema,
-  invoiceSettingsSchema,
-  ALLOWED_LOGO_MIME_TYPES,
-  MAX_LOGO_FILE_SIZE_MB,
 } from "@/lib/validations/superadmin";
 
 type ActionResult = { error?: string } | void;
@@ -161,18 +158,17 @@ export async function updateOrganizationLimits(
 
 export async function updateOrganizationAppearance(
   organizationId: string,
-  businessType: string,
-  themeColor: string | null
+  businessType: string
 ): Promise<{ error?: string }> {
   const profile = await requireRole("super_admin");
 
-  const parsed = appearanceSchema.safeParse({ businessType, themeColor });
+  const parsed = appearanceSchema.safeParse({ businessType });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("organizations")
-    .update({ business_type: parsed.data.businessType, theme_color: parsed.data.themeColor })
+    .update({ business_type: parsed.data.businessType })
     .eq("id", organizationId);
   if (error) {
     return { error: friendlyDbError(error, "updateOrganizationAppearance", "No se pudo guardar la apariencia", {
@@ -184,74 +180,11 @@ export async function updateOrganizationAppearance(
   await logActivity(
     profile,
     "Actualizó apariencia de la organización",
-    `${parsed.data.businessType} ${parsed.data.themeColor ?? "color por defecto"}`
+    parsed.data.businessType
   );
   revalidatePath(`/superadmin/organizaciones/${organizationId}`);
   revalidatePath("/dashboard", "layout");
   return {};
-}
-
-export async function updateInvoiceSettings(
-  organizationId: string,
-  _prev: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
-  const profile = await requireRole("super_admin");
-
-  const parsed = invoiceSettingsSchema.safeParse({
-    legalName: formData.get("legalName") ?? "",
-    taxId: formData.get("taxId") ?? "",
-    billingAddress: formData.get("billingAddress") ?? "",
-    billingPhone: formData.get("billingPhone") ?? "",
-    billingEmail: formData.get("billingEmail") ?? "",
-    invoiceFooter: formData.get("invoiceFooter") ?? "",
-    currency: formData.get("currency") || "COP",
-    invoicePrefix: formData.get("invoicePrefix") ?? "",
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-
-  const supabase = await createClient();
-
-  const file = formData.get("logo") as File | null;
-  let logoUrl: string | undefined;
-  if (file && file.size > 0) {
-    if (!ALLOWED_LOGO_MIME_TYPES.includes(file.type)) {
-      return { error: "El logo debe ser una imagen (PNG, JPG o WEBP)" };
-    }
-    if (file.size > MAX_LOGO_FILE_SIZE_MB * 1024 * 1024) {
-      return { error: `El logo no puede superar ${MAX_LOGO_FILE_SIZE_MB}MB` };
-    }
-    const path = `${organizationId}/logo-${crypto.randomUUID()}`;
-    // Se sube con la service role: la política de storage de "branding" exige
-    // que la carpeta sea la organización del usuario, y el super admin no
-    // pertenece a ninguna, así que con su sesión la subida siempre fallaba.
-    // La autorización ya se validó arriba (requireRole("super_admin")).
-    const admin = createAdminClient();
-    const { error: uploadError } = await admin.storage
-      .from("branding")
-      .upload(path, file, { contentType: file.type, upsert: true });
-    if (uploadError) return { error: friendlyDbError(uploadError, "updateInvoiceSettings:upload", "No se pudo subir el logo") };
-    logoUrl = admin.storage.from("branding").getPublicUrl(path).data.publicUrl;
-  }
-
-  const { error } = await supabase
-    .from("organizations")
-    .update({
-      legal_name: parsed.data.legalName || null,
-      tax_id: parsed.data.taxId || null,
-      billing_address: parsed.data.billingAddress || null,
-      billing_phone: parsed.data.billingPhone || null,
-      billing_email: parsed.data.billingEmail || null,
-      invoice_footer: parsed.data.invoiceFooter || null,
-      currency: parsed.data.currency,
-      invoice_prefix: parsed.data.invoicePrefix || "",
-      ...(logoUrl ? { logo_url: logoUrl } : {}),
-    })
-    .eq("id", organizationId);
-  if (error) return { error: friendlyDbError(error, "updateInvoiceSettings", "No se pudo actualizar la información de facturación") };
-
-  await logActivity(profile, "Actualizó datos de facturación", organizationId);
-  revalidatePath(`/superadmin/organizaciones/${organizationId}`);
 }
 
 export async function deleteOrganization(organizationId: string): Promise<ActionResult> {

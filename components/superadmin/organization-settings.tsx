@@ -15,7 +15,6 @@ import {
   toggleOrganizationActive,
 } from "@/lib/actions/superadmin";
 import { BUSINESS_TYPES, BUSINESS_TYPE_KEYS } from "@/lib/business-types";
-import { DEFAULT_THEME_COLOR, THEME_PRESETS, isHexColor } from "@/lib/theme";
 import type { Organization } from "@/lib/supabase/types";
 
 const CATEGORIA_STEPS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5); // 5..100
@@ -32,23 +31,15 @@ export function OrganizationSettings({ organization }: { organization: Organizat
   const [savingCatalogo, setSavingCatalogo] = React.useState(false);
   const [togglingActive, setTogglingActive] = React.useState(false);
   const [businessType, setBusinessType] = React.useState(organization.business_type || "general");
-  const [themeColor, setThemeColor] = React.useState(
-    isHexColor(organization.theme_color) ? organization.theme_color : DEFAULT_THEME_COLOR
-  );
   const [savingLook, setSavingLook] = React.useState(false);
   const [lookError, setLookError] = React.useState<string | null>(null);
-
-  const savedColor = isHexColor(organization.theme_color)
-    ? organization.theme_color
-    : DEFAULT_THEME_COLOR;
 
   async function handleSaveLook() {
     setSavingLook(true);
     setLookError(null);
     const result = await updateOrganizationAppearance(
       organization.id,
-      businessType,
-      themeColor.toLowerCase() === DEFAULT_THEME_COLOR.toLowerCase() ? null : themeColor
+      businessType
     );
     setSavingLook(false);
     if (result.error) {
@@ -103,8 +94,8 @@ export function OrganizationSettings({ organization }: { organization: Organizat
           <div>
             <p className="font-medium text-brand-ink">Apariencia</p>
             <p className="text-sm text-brand-muted">
-              El tipo de negocio define los íconos sugeridos en las categorías. El color se
-              aplica a toda la interfaz de esta organización.
+              El tipo de negocio define los íconos sugeridos en las categorías. El color de la
+              página lo elige cada negocio desde su módulo Mi Cuenta.
             </p>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -122,48 +113,13 @@ export function OrganizationSettings({ organization }: { organization: Organizat
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="themeColor">Color de la página</Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                id="themeColor"
-                type="color"
-                value={themeColor}
-                onChange={(event) => setThemeColor(event.target.value)}
-                className="h-9 w-12 cursor-pointer rounded border border-brand-border bg-white p-1"
-              />
-              {THEME_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  aria-label={`Usar color ${preset}`}
-                  onClick={() => setThemeColor(preset)}
-                  style={{ backgroundColor: preset }}
-                  className={`h-7 w-7 rounded-full border-2 ${
-                    themeColor.toLowerCase() === preset.toLowerCase()
-                      ? "border-brand-ink"
-                      : "border-transparent"
-                  }`}
-                />
-              ))}
-              <button
-                type="button"
-                className="text-xs text-brand-muted underline"
-                onClick={() => setThemeColor(DEFAULT_THEME_COLOR)}
-              >
-                Restablecer
-              </button>
-            </div>
-          </div>
           {lookError && <p className="text-sm text-brand-danger">{lookError}</p>}
           <Button
             variant="outline"
             className="self-start"
             onClick={handleSaveLook}
             disabled={
-              savingLook ||
-              (businessType === (organization.business_type || "general") &&
-                themeColor.toLowerCase() === savedColor.toLowerCase())
+              savingLook || businessType === (organization.business_type || "general")
             }
           >
             {savingLook ? "Guardando..." : "Guardar apariencia"}

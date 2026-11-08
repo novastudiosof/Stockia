@@ -23,7 +23,9 @@ panel de super administrador.
    `015_seguridad_tipo_negocio_color.sql`,
    `016_informes_utilidad.sql`,
    `017_feed_ventas_gastos_enlace_factura.sql`,
-   `018_corrige_profit_by_product.sql`.
+   `018_corrige_profit_by_product.sql`,
+   `019_devoluciones.sql`,
+   `020_borradores_venta.sql`.
 
 ## 2. Crear el primer super administrador
 

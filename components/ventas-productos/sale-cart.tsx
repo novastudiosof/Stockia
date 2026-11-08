@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, Search, ShoppingCart, Trash2, User } from "lucide-react";
+import { Clock, FilePlus, Minus, Plus, Search, ShoppingCart, Trash2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,21 @@ import { createSale } from "@/lib/actions/ventas-productos";
 import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
 import { WhatsappInvoiceButton } from "@/components/ventas-productos/whatsapp-invoice-button";
 import { searchClientes } from "@/lib/actions/clientes";
-import type { Cliente, PaymentInput, Product, TransferChannel } from "@/lib/supabase/types";
+import {
+  deleteSaleDraft,
+  listSaleDrafts,
+  saveSaleDraft,
+  takeSaleDraft,
+  transferSaleDraft,
+} from "@/lib/actions/borradores";
+import type {
+  Cliente,
+  PaymentInput,
+  Product,
+  SaleDraft,
+  SaleDraftState,
+  TransferChannel,
+} from "@/lib/supabase/types";
 
 const currency = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -29,6 +43,12 @@ interface SaleCartProps {
   products: Product[];
   /** Si el módulo Clientes no está activo, solo se vende a "Consumidor final". */
   clientesEnabled: boolean;
+  /** Ventas en espera de la organización (las ven todos los usuarios). */
+  initialDrafts: SaleDraft[];
+  currentUserId: string;
+  isAdmin: boolean;
+  /** Usuarios del negocio, para pasarse una venta en espera. */
+  teammates: { id: string; full_name: string }[];
 }
 
 type PayMethod = "efectivo" | "transferencia" | "mixto";
@@ -53,7 +73,17 @@ const CUSTOMER_MODE_LABEL: Record<CustomerMode, string> = {
   new: "Cliente nuevo",
 };
 
-export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
+const EMPTY_NEW_CUSTOMER = { nombre: "", documento: "", telefono: "", direccion: "" };
+const EMPTY_MIXED = { efectivo: "", nequi: "", daviplata: "", llave: "" };
+
+export function SaleCart({
+  products,
+  clientesEnabled,
+  initialDrafts,
+  currentUserId,
+  isAdmin,
+  teammates,
+}: SaleCartProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [cart, setCart] = React.useState<Record<string, CartLine>>({});
@@ -82,7 +112,18 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
   const [searchedQuery, setSearchedQuery] = React.useState<string | null>(null);
   const [payMethod, setPayMethod] = React.useState<PayMethod>("efectivo");
   const [channel, setChannel] = React.useState<TransferChannel>("nequi");
-  const [mixed, setMixed] = React.useState({ efectivo: "", nequi: "", daviplata: "", llave: "" });
+  const [mixed, setMixed] = React.useState({ ...EMPTY_MIXED });
+
+  // Venta en espera (borrador): se guarda en la base de datos; la ven todos
+  // los usuarios del negocio pero solo la edita su responsable.
+  const [drafts, setDrafts] = React.useState<SaleDraft[]>(initialDrafts);
+  const [draftId, setDraftId] = React.useState<string | null>(null);
+  const [hydrated, setHydrated] = React.useState(false);
+  const [draftSaving, setDraftSaving] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [transferring, setTransferring] = React.useState(false);
+  const draftIdRef = React.useRef<string | null>(null);
+  const saveChainRef = React.useRef<Promise<unknown>>(Promise.resolve());
+  const initialDraftsRef = React.useRef(initialDrafts);
 
   const term = search.toLowerCase();
   const filtered = products.filter(
@@ -181,6 +222,101 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
     });
   }
 
+  function applyDraft(draft: SaleDraft) {
+    const state = draft.state;
+    const nextCart: Record<string, CartLine> = {};
+    for (const line of state.lines) {
+      const product = products.find((p) => p.id === line.productId);
+      if (!product || product.quantity <= 0) continue;
+      nextCart[product.id] = { product, quantity: Math.min(line.quantity, product.quantity) };
+    }
+    setCart(nextCart);
+    setCustomerMode(state.customerMode);
+    setSelectedCustomer(state.selectedCustomer);
+    setCustomerQuery(state.selectedCustomer?.nombre ?? "");
+    setSearchedQuery(null);
+    setCustomerResults([]);
+    setNewCustomer({ ...EMPTY_NEW_CUSTOMER, ...state.newCustomer });
+    setCustomerEmail(state.customerEmail);
+    setWhatsapp(state.whatsapp);
+    setCashReceived(state.cashReceived);
+    setPayMethod(state.payMethod);
+    setChannel(state.channel);
+    setMixed({ ...EMPTY_MIXED, ...state.mixed });
+    setError(null);
+    setSuccess(null);
+    setLastSaleId(null);
+    draftIdRef.current = draft.id;
+    setDraftId(draft.id);
+  }
+
+  function resetSaleForm() {
+    setCart({});
+    setCustomerEmail("");
+    setWhatsapp("");
+    setCashReceived("");
+    setPayMethod("efectivo");
+    setChannel("nequi");
+    setMixed({ ...EMPTY_MIXED });
+    selectCustomerMode("none");
+    setNewCustomer({ ...EMPTY_NEW_CUSTOMER });
+  }
+
+  function detachDraft() {
+    draftIdRef.current = null;
+    setDraftId(null);
+    setDraftSaving("idle");
+    resetSaleForm();
+  }
+
+  /** La venta que estaba abierta aquí ya no es de este usuario (la terminaron, descartaron o pasaron). */
+  function handleDraftLost(message: string) {
+    detachDraft();
+    setSuccess(null);
+    setError(message);
+  }
+
+  /** Deja la venta en espera guardada y empieza una venta limpia. */
+  function startNewSale() {
+    detachDraft();
+    setError(null);
+    setSuccess(null);
+    setLastSaleId(null);
+  }
+
+  async function discardDraft(id: string) {
+    await deleteSaleDraft(id);
+    if (draftIdRef.current === id) detachDraft();
+    setDrafts((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  async function passDraft(id: string, toUserId: string) {
+    const target = teammates.find((t) => t.id === toUserId);
+    if (!target) return;
+    setTransferring(true);
+    setError(null);
+    if (draftIdRef.current === id) await saveChainRef.current;
+    const result = await transferSaleDraft(id, toUserId);
+    setTransferring(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    if (draftIdRef.current === id) detachDraft();
+    setSuccess("Venta pasada a " + target.full_name + ". Ya puede continuarla desde Ventas por Productos.");
+    setDrafts(await listSaleDrafts());
+  }
+
+  async function takeDraft(id: string) {
+    const result = await takeSaleDraft(id);
+    if (result.error || !result.draft) {
+      setError(result.error ?? "No se pudo tomar la venta");
+      return;
+    }
+    applyDraft(result.draft);
+    setDrafts(await listSaleDrafts());
+  }
+
   async function handleConfirm() {
     if (lines.length === 0) return;
     if (customerMode === "new" && !newCustomer.nombre.trim()) {
@@ -263,19 +399,230 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
     setSuccess(`Venta registrada por ${currency.format(result.total ?? 0)}${changeText}`);
     setLastSaleId(result.saleId ?? null);
     setLastSalePhone(salePhone || null);
-    setCart({});
-    setCustomerEmail("");
-    setWhatsapp("");
-    setCashReceived("");
-    setPayMethod("efectivo");
-    setChannel("nequi");
-    setMixed({ efectivo: "", nequi: "", daviplata: "", llave: "" });
-    selectCustomerMode("none");
-    setNewCustomer({ nombre: "", documento: "", telefono: "", direccion: "" });
+    // Espera a que termine cualquier guardado en curso y elimina la venta en
+    // espera para que no reaparezca.
+    const finishedDraftId = draftIdRef.current;
+    draftIdRef.current = null;
+    setDraftId(null);
+    setDraftSaving("idle");
+    resetSaleForm();
+    if (finishedDraftId) {
+      await saveChainRef.current;
+      await deleteSaleDraft(finishedDraftId);
+      setDrafts((prev) => prev.filter((d) => d.id !== finishedDraftId));
+    }
     router.refresh();
   }
 
+  // Al entrar a la pantalla se retoma la última venta en espera propia.
+  React.useEffect(() => {
+    const mine = initialDraftsRef.current.find((d) => d.assigned_to === currentUserId);
+    if (mine) applyDraft(mine);
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Guardado automático (con pausa para no saturar la base).
+  const draftState: SaleDraftState = {
+    lines: lines.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+    customerMode,
+    selectedCustomer,
+    newCustomer,
+    customerEmail,
+    whatsapp,
+    cashReceived,
+    payMethod,
+    channel,
+    mixed,
+  };
+  const draftKey = JSON.stringify(draftState);
+  const totalRef = React.useRef(total);
+  React.useEffect(() => {
+    totalRef.current = total;
+  });
+
+  React.useEffect(() => {
+    if (!hydrated || submitting) return;
+
+    if (draftState.lines.length === 0) {
+      const existing = draftIdRef.current;
+      if (existing) {
+        draftIdRef.current = null;
+        setDraftId(null);
+        setDraftSaving("idle");
+        saveChainRef.current = saveChainRef.current.then(() => deleteSaleDraft(existing));
+      }
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setDraftSaving("saving");
+      saveChainRef.current = saveChainRef.current.then(async () => {
+        const result = await saveSaleDraft(draftIdRef.current, draftState, totalRef.current);
+        if (result.gone) {
+          handleDraftLost("Esta venta en espera ya fue terminada o descartada por otro usuario.");
+        } else if (result.taken) {
+          handleDraftLost("Esta venta en espera ahora la tiene otro usuario.");
+        } else if (result.id) {
+          draftIdRef.current = result.id;
+          setDraftId(result.id);
+          setDraftSaving("saved");
+        } else {
+          setDraftSaving("error");
+        }
+      });
+    }, 800);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, hydrated, submitting]);
+
+  // Refresca la lista para ver las ventas en espera de los demás usuarios.
+  React.useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      if (document.visibilityState !== "visible") return;
+      await saveChainRef.current;
+      const list = await listSaleDrafts();
+      if (cancelled) return;
+      setDrafts(list);
+      const activeId = draftIdRef.current;
+      if (!activeId) return;
+      const active = list.find((d) => d.id === activeId);
+      if (!active) {
+        handleDraftLost("Esta venta en espera ya fue terminada o descartada por otro usuario.");
+      } else if (active.assigned_to !== currentUserId) {
+        handleDraftLost(
+          (active.assigned_to_name ?? "Otro usuario") + " tomó esta venta en espera."
+        );
+      }
+    }
+    refresh();
+    const interval = setInterval(refresh, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const activeDraft = drafts.find((d) => d.id === draftId) ?? null;
+  const otherDrafts = drafts.filter((d) => d.id !== draftId);
+  const otherTeammates = teammates.filter((t) => t.id !== currentUserId);
+
+  function renderPassSelect(id: string, label: string) {
+    if (otherTeammates.length === 0) return null;
+    return (
+      <select
+        aria-label={label}
+        disabled={transferring}
+        value=""
+        onChange={(event) => {
+          if (event.target.value) passDraft(id, event.target.value);
+        }}
+        className="h-8 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-2 text-xs"
+      >
+        <option value="">Pasar a...</option>
+        {otherTeammates.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.full_name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   return (
+    <div className="flex flex-col gap-4">
+      {(draftId || otherDrafts.length > 0) && (
+        <div className="rounded-[var(--radius-brand-md)] border border-brand-border bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-2 text-sm font-medium text-brand-ink">
+              <Clock className="h-4 w-4" />
+              Ventas en espera
+              {otherDrafts.length > 0 ? " (" + otherDrafts.length + " más)" : ""}
+            </p>
+            {draftId && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-brand-muted">
+                  Esta venta la inició{" "}
+                  <span className="font-medium text-brand-ink">
+                    {activeDraft?.created_by_name ?? "—"}
+                  </span>
+                  {activeDraft && activeDraft.assigned_to === currentUserId
+                    ? " · la tienes tú"
+                    : ""}
+                  {" · "}
+                  {draftSaving === "saving"
+                    ? "Guardando..."
+                    : draftSaving === "error"
+                      ? "No se pudo guardar"
+                      : "Guardada"}
+                </span>
+                {renderPassSelect(draftId, "Pasar esta venta a otro usuario")}
+                <Button variant="outline" size="sm" onClick={startNewSale}>
+                  <FilePlus className="h-4 w-4" />
+                  Nueva venta
+                </Button>
+              </div>
+            )}
+          </div>
+          {otherDrafts.length > 0 && (
+            <ul className="mt-2 flex flex-col divide-y divide-brand-border">
+              {otherDrafts.map((draft) => {
+                const items = draft.state.lines.reduce((sum, l) => sum + l.quantity, 0);
+                const mine = draft.assigned_to === currentUserId || draft.assigned_to === null;
+                const starter = draft.created_by_name ?? "—";
+                const holder = draft.assigned_to_name ?? "nadie";
+                return (
+                  <li key={draft.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <div className="text-sm">
+                      <p className="text-brand-ink">
+                        {items} {items === 1 ? "producto" : "productos"} ·{" "}
+                        {currency.format(draft.total)} ·{" "}
+                        {draft.state.selectedCustomer?.nombre ?? "Consumidor final"}
+                      </p>
+                      <p className="text-xs text-brand-muted">
+                        Iniciada por <span className="font-medium text-brand-ink">{starter}</span>
+                        {" · "}
+                        {mine ? "la tienes tú" : "la tiene " + holder} ·{" "}
+                        {new Intl.DateTimeFormat("es-CO", { timeStyle: "short" }).format(
+                          new Date(draft.updated_at)
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {mine && (
+                        <>
+                          <Button size="sm" onClick={() => applyDraft(draft)}>
+                            Continuar
+                          </Button>
+                          {renderPassSelect(draft.id, "Pasar esta venta a otro usuario")}
+                        </>
+                      )}
+                      {!mine && isAdmin && (
+                        <Button size="sm" variant="outline" onClick={() => takeDraft(draft.id)}>
+                          Tomar
+                        </Button>
+                      )}
+                      {(mine || isAdmin) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Descartar venta en espera"
+                          onClick={() => discardDraft(draft.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-brand-danger" />
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="flex flex-col gap-4 lg:col-span-2">
         <div className="relative">
@@ -655,6 +1002,7 @@ export function SaleCart({ products, clientesEnabled }: SaleCartProps) {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   );
 }

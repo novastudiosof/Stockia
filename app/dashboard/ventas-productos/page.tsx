@@ -2,6 +2,7 @@ import { requireProfile } from "@/lib/auth";
 import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { SaleCart } from "@/components/ventas-productos/sale-cart";
+import { listSaleDrafts } from "@/lib/actions/borradores";
 import { SalesHistory } from "@/components/ventas-productos/sales-history";
 import type { Product, Sale } from "@/lib/supabase/types";
 
@@ -14,7 +15,7 @@ export default async function VentasProductosPage() {
 
   const supabase = await createClient();
 
-  const [{ data: products }, { data: sales }] = await Promise.all([
+  const [{ data: products }, { data: sales }, drafts, { data: team }] = await Promise.all([
     supabase
       .from("products")
       .select("*")
@@ -26,7 +27,14 @@ export default async function VentasProductosPage() {
       .eq("organization_id", profile.organization_id)
       .order("created_at", { ascending: false })
       .limit(20),
+    listSaleDrafts(),
+    supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("organization_id", profile.organization_id)
+      .order("full_name", { ascending: true }),
   ]);
+  const teammates = (team as { id: string; full_name: string }[]) ?? [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -37,7 +45,14 @@ export default async function VentasProductosPage() {
         </p>
       </div>
 
-      <SaleCart products={(products as Product[]) ?? []} clientesEnabled={clientesEnabled} />
+      <SaleCart
+        products={(products as Product[]) ?? []}
+        clientesEnabled={clientesEnabled}
+        initialDrafts={drafts}
+        currentUserId={profile.id}
+        isAdmin={profile.role === "owner"}
+        teammates={teammates}
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-brand-ink">Ventas recientes</h2>

@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { ChangePasswordForm } from "@/components/cuenta/change-password-form";
 import { AuxiliarManager } from "@/components/cuenta/auxiliar-manager";
 import { ConceptsManager } from "@/components/cuenta/concepts-manager";
+import { InvoiceSettings } from "@/components/cuenta/invoice-settings";
+import { ThemeColorForm } from "@/components/cuenta/theme-color-form";
 import { isModuleEnabled, MODULE_KEYS } from "@/lib/modules";
-import type { MovementConcept, Profile } from "@/lib/supabase/types";
+import type { MovementConcept, Organization, Profile } from "@/lib/supabase/types";
 
 export default async function CuentaPage() {
   const profile = await requireProfile();
@@ -13,6 +15,7 @@ export default async function CuentaPage() {
   let maxAuxiliares = 0;
   let concepts: MovementConcept[] = [];
   let showConcepts = false;
+  let organization: Organization | null = null;
 
   if (profile.role === "owner" && profile.organization_id) {
     const supabase = await createClient();
@@ -25,7 +28,7 @@ export default async function CuentaPage() {
         .order("created_at", { ascending: true }),
       supabase
         .from("organizations")
-        .select("max_auxiliares")
+        .select("*")
         .eq("id", profile.organization_id)
         .single(),
     ]);
@@ -39,7 +42,8 @@ export default async function CuentaPage() {
       showConcepts = true;
     }
     auxiliares = (aux as Profile[]) ?? [];
-    maxAuxiliares = org?.max_auxiliares ?? 0;
+    organization = (org as Organization) ?? null;
+    maxAuxiliares = organization?.max_auxiliares ?? 0;
   }
 
   return (
@@ -52,6 +56,13 @@ export default async function CuentaPage() {
       </div>
 
       <ChangePasswordForm />
+
+      {profile.role === "owner" && organization && (
+        <>
+          <ThemeColorForm savedColor={organization.theme_color} />
+          <InvoiceSettings organization={organization} />
+        </>
+      )}
 
       {profile.role === "owner" && (
         <AuxiliarManager auxiliares={auxiliares} maxAuxiliares={maxAuxiliares} />

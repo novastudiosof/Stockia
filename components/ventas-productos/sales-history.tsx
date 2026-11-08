@@ -3,12 +3,20 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Printer, Search, X } from "lucide-react";
+import { Ban, Printer, Search, Undo2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { voidSale, searchSales } from "@/lib/actions/ventas-productos";
 import { paymentLabel } from "@/lib/payments";
 import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
@@ -35,6 +43,10 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
   const router = useRouter();
   const [voiding, setVoiding] = React.useState<Sale | null>(null);
   const [isVoiding, setIsVoiding] = React.useState(false);
+  const [returning, setReturning] = React.useState<Sale | null>(null);
+  const [returnReason, setReturnReason] = React.useState("");
+  const [isReturning, setIsReturning] = React.useState(false);
+  const [returnError, setReturnError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const [query, setQuery] = React.useState("");
@@ -83,6 +95,21 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
       return;
     }
     setVoiding(null);
+    router.refresh();
+  }
+
+  async function handleReturn() {
+    if (!returning) return;
+    setIsReturning(true);
+    setReturnError(null);
+    const result = await voidSale(returning.id, "devolucion", returnReason);
+    setIsReturning(false);
+    if (result?.error) {
+      setReturnError(result.error);
+      return;
+    }
+    setReturning(null);
+    setReturnReason("");
     router.refresh();
   }
 
@@ -142,7 +169,11 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
                   {sale.sale_number ? `#${sale.sale_number} · ` : ""}
                   {dateTime.format(new Date(sale.created_at))}
                 </p>
-                {sale.voided_at && <Badge variant="danger">Anulada</Badge>}
+                {sale.voided_at && (
+                  <Badge variant="danger">
+                    {sale.void_kind === "devolucion" ? "Devuelta" : "Anulada"}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-brand-ink">{currency.format(sale.total)}</p>
@@ -161,6 +192,21 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => {
+                      setReturnError(null);
+                      setReturnReason("");
+                      setReturning(sale);
+                    }}
+                    aria-label="Devolución"
+                    title="Devolución"
+                  >
+                    <Undo2 className="h-4 w-4 text-brand-ink" />
+                  </Button>
+                )}
+                {canVoid && !sale.voided_at && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setVoiding(sale)}
                     aria-label="Anular venta"
                   >
@@ -172,6 +218,7 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
             <p className="mt-1 text-xs text-brand-muted">
               {sale.customer_snapshot && <>Cliente: {sale.customer_snapshot.nombre} · </>}
               Vendido por: {sale.sold_by_name ?? "—"} · Pago: {paymentLabel(sale)}
+              {sale.void_kind === "devolucion" && sale.void_reason && <> · Motivo: {sale.void_reason}</>}
             </p>
             <ul className="mt-2 flex flex-col gap-1 text-sm text-brand-muted">
               {sale.items.map((item, idx) => (
@@ -185,6 +232,43 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
             </ul>
           </div>
         ))
+      )}
+
+      {canVoid && (
+        <Dialog open={!!returning} onOpenChange={(open) => !open && !isReturning && setReturning(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Devolución de venta</DialogTitle>
+              <DialogDescription>
+                Se devuelve la venta completa{returning ? ` por ${currency.format(returning.total)}` : ""} y
+                el stock de todos sus productos regresa al inventario. Si el cliente solo devuelve
+                algunos productos, registra la devolución y luego haz de nuevo la venta con los
+                productos que se queda.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="returnReason" className="text-sm font-medium text-brand-ink">
+                Motivo (opcional)
+              </label>
+              <Input
+                id="returnReason"
+                maxLength={200}
+                value={returnReason}
+                onChange={(event) => setReturnReason(event.target.value)}
+                placeholder="Ej: producto en mal estado"
+              />
+              {returnError && <p className="text-sm text-brand-danger">{returnError}</p>}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReturning(null)} disabled={isReturning}>
+                Cancelar
+              </Button>
+              <Button onClick={handleReturn} disabled={isReturning}>
+                {isReturning ? "Registrando..." : "Registrar devolución"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {canVoid && (
