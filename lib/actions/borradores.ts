@@ -23,6 +23,7 @@ const draftStateSchema = z.object({
       id: z.string().uuid(),
       organization_id: z.string().uuid(),
       nombre: text(200),
+      tipo_documento: text(20).nullable().default(null),
       documento: text(60).nullable(),
       telefono: text(60).nullable(),
       email: text(200).nullable(),

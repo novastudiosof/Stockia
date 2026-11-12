@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { requireProfile } from "@/lib/auth";
+import { getTaxSettings } from "@/lib/org-tax";
 import { createClient } from "@/lib/supabase/server";
 import { ProductsTable } from "@/components/catalogo/products-table";
 import { ImportProductsButton } from "@/components/catalogo/import-products-button";
@@ -26,6 +27,8 @@ export default async function CategoryDetailPage({
     .single();
 
   if (!category) notFound();
+
+  const taxSettings = await getTaxSettings(profile.organization_id);
 
   const { data: products } = await supabase
     .from("products")
@@ -61,6 +64,7 @@ export default async function CategoryDetailPage({
         categoryId={categoryId}
         products={(products as Product[]) ?? []}
         canEdit={profile.role === "owner"}
+        taxSettings={taxSettings}
       />
     </div>
   );

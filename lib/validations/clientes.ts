@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const clienteSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(120),
+  tipoDocumento: z.enum(["", "CC", "NIT", "CE", "TI", "PAS", "RC", "DIE"]).optional(),
   documento: z.string().trim().max(40).optional().or(z.literal("")),
   telefono: z.string().trim().max(30).optional().or(z.literal("")),
   email: z

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProductFormDialog } from "@/components/catalogo/product-form-dialog";
+import { finalUnitPrice, taxLabel, type TaxSettings } from "@/lib/tax";
 import { StockAdjustDialog } from "@/components/catalogo/stock-adjust-dialog";
 import { createProduct, updateProduct, deleteProduct } from "@/lib/actions/catalogo";
 import type { Product } from "@/lib/supabase/types";
@@ -25,9 +26,10 @@ interface ProductsTableProps {
   categoryId: string;
   products: Product[];
   canEdit: boolean;
+  taxSettings: TaxSettings;
 }
 
-export function ProductsTable({ categoryId, products, canEdit }: ProductsTableProps) {
+export function ProductsTable({ categoryId, products, canEdit, taxSettings }: ProductsTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [addOpen, setAddOpen] = React.useState(false);
@@ -112,7 +114,14 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
                   </div>
                 </td>
                 <td data-label="Precio compra" className="p-3">{currency.format(product.purchase_price)}</td>
-                <td data-label="Precio venta" className="p-3">{currency.format(product.sale_price)}</td>
+                <td data-label="Precio venta" className="p-3">
+                  {currency.format(finalUnitPrice(product.sale_price, product.tax_rate, taxSettings))}
+                  {taxSettings.taxEnabled && product.tax_rate > 0 && (
+                    <p className="text-xs font-normal text-brand-muted">
+                      {taxLabel(product.tax_kind, product.tax_rate)} incluido
+                    </p>
+                  )}
+                </td>
                 <td data-label="Descripción" className="p-3 text-brand-muted">{product.description || "—"}</td>
                 {canEdit && (
                   <td data-label="" className="p-3">
@@ -142,7 +151,12 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
 
       {canEdit && (
         <>
-          <ProductFormDialog open={addOpen} onOpenChange={setAddOpen} action={boundCreate} />
+          <ProductFormDialog
+            open={addOpen}
+            onOpenChange={setAddOpen}
+            action={boundCreate}
+            taxSettings={taxSettings}
+          />
 
           {editing && boundUpdate && (
             <ProductFormDialog
@@ -150,6 +164,7 @@ export function ProductsTable({ categoryId, products, canEdit }: ProductsTablePr
               onOpenChange={(open) => !open && setEditing(null)}
               product={editing}
               action={boundUpdate}
+              taxSettings={taxSettings}
             />
           )}
 

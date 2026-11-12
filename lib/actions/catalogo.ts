@@ -13,6 +13,7 @@ import {
   validateCategoryImage,
 } from "@/lib/category-image";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
+import { parseTaxOption } from "@/lib/tax";
 import {
   categorySchema,
   productSchema,
@@ -172,8 +173,11 @@ export async function createProduct(
     purchasePrice: formData.get("purchasePrice"),
     salePrice: formData.get("salePrice"),
     barcode: formData.get("barcode") ?? "",
+    tax: formData.get("tax") ?? undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  const tax = parsed.data.tax ? parseTaxOption(parsed.data.tax) : null;
+  if (parsed.data.tax && !tax) return { error: "Impuesto inválido" };
 
   const supabase = await createClient();
 
@@ -202,6 +206,22 @@ export async function createProduct(
     };
   }
 
+  // El impuesto se guarda aparte para no cambiar la firma de create_product().
+  if (tax && (tax.kind !== "excluido" || tax.rate !== 0)) {
+    const { error: taxError } = await supabase
+      .from("products")
+      .update({ tax_kind: tax.kind, tax_rate: tax.rate })
+      .eq("id", (product as { id: string }).id);
+    if (taxError) {
+      return {
+        error: friendlyDbError(taxError, "createProduct:tax", "El producto se creó, pero no se pudo guardar el impuesto", {
+          PGRST204: "Falta ejecutar la migración 023 en Supabase",
+          "42703": "Falta ejecutar la migración 023 en Supabase",
+        }),
+      };
+    }
+  }
+
   await logActivity(profile, "Creó producto", parsed.data.name);
   revalidatePath(`/dashboard/catalogo/${categoryId}`);
   revalidatePath("/dashboard/catalogo");
@@ -222,13 +242,17 @@ export async function updateProduct(
     purchasePrice: formData.get("purchasePrice"),
     salePrice: formData.get("salePrice"),
     barcode: formData.get("barcode") ?? "",
+    tax: formData.get("tax") ?? undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  const tax = parsed.data.tax ? parseTaxOption(parsed.data.tax) : null;
+  if (parsed.data.tax && !tax) return { error: "Impuesto inválido" };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("products")
     .update({
+      ...(tax ? { tax_kind: tax.kind, tax_rate: tax.rate } : {}),
       name: parsed.data.name,
       description: parsed.data.description || null,
       purchase_price: parsed.data.purchasePrice,

@@ -1,6 +1,7 @@
 import { getInvoiceTicket } from "@/lib/actions/ventas-productos";
 import { paymentDetail, paymentLabel } from "@/lib/payments";
 import { buildTicketPdf } from "@/lib/ticket-pdf";
+import { summarizeTaxes } from "@/lib/tax";
 
 const dateTime = new Intl.DateTimeFormat("es-CO", { dateStyle: "short", timeStyle: "short" });
 
@@ -42,26 +43,36 @@ export async function buildInvoicePdf(
     : sale.id.slice(0, 8).toUpperCase();
   const orgName = organization.legal_name || organization.name;
   const customerName = sale.customer_snapshot?.nombre ?? "Consumidor final";
+  const taxRows = summarizeTaxes(sale.items);
+  const taxSum = taxRows.reduce((sum, row) => sum + row.tax, 0);
 
   const blob = buildTicketPdf(
     {
       orgName,
-      taxId: organization.tax_id,
+      taxId: organization.tax_id
+        ? `${organization.tax_id}${organization.tax_dv ? `-${organization.tax_dv}` : ""}`
+        : null,
       address: organization.billing_address,
       phone: organization.billing_phone,
       invoiceNumber,
       dateLabel: dateTime.format(new Date(sale.created_at)),
       voided: Boolean(sale.voided_at),
       customerName,
-      customerDocument: sale.customer_snapshot?.documento ?? null,
+      customerDocument: sale.customer_snapshot?.documento
+        ? `${sale.customer_snapshot.tipo_documento ? `${sale.customer_snapshot.tipo_documento} ` : ""}${sale.customer_snapshot.documento}`
+        : null,
       customerPhone: sale.customer_snapshot?.telefono ?? null,
       soldBy: sale.sold_by_name,
       items: sale.items.map((item) => ({
         name: item.name,
         quantity: item.quantity,
-        unitPrice: money(item.unitPrice),
+        unitPrice: money(
+          item.taxRate && item.taxRate > 0 ? item.subtotal / item.quantity : item.unitPrice
+        ),
         subtotal: money(item.subtotal),
       })),
+      subtotal: taxSum > 0 ? money(sale.total - taxSum) : undefined,
+      taxLines: taxRows.map((row) => ({ label: row.label, amount: money(row.tax) })),
       total: money(sale.total),
       paymentText:
         sale.payment_method === "mixto"

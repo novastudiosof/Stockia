@@ -28,6 +28,8 @@ import type {
   TransferChannel,
 } from "@/lib/supabase/types";
 
+import { computeLineTax, summarizeTaxes, type TaxSettings } from "@/lib/tax";
+
 const currency = new Intl.NumberFormat("es-CO", {
   style: "currency",
   currency: "COP",
@@ -49,6 +51,8 @@ interface SaleCartProps {
   isAdmin: boolean;
   /** Usuarios del negocio, para pasarse una venta en espera. */
   teammates: { id: string; full_name: string }[];
+  /** Impuestos del negocio (apagados por defecto). */
+  taxSettings: TaxSettings;
 }
 
 type PayMethod = "efectivo" | "transferencia" | "mixto";
@@ -83,6 +87,7 @@ export function SaleCart({
   currentUserId,
   isAdmin,
   teammates,
+  taxSettings,
 }: SaleCartProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
@@ -131,7 +136,20 @@ export function SaleCart({
   );
 
   const lines = Object.values(cart);
-  const total = lines.reduce((sum, line) => sum + line.product.sale_price * line.quantity, 0);
+  // Mismo cálculo que create_sale() en la base de datos (que es el oficial).
+  const lineTaxes = lines.map((line) =>
+    computeLineTax(line.product.sale_price, line.quantity, line.product.tax_rate, taxSettings)
+  );
+  const total = lineTaxes.reduce((sum, t) => sum + t.total, 0);
+  const taxTotal = lineTaxes.reduce((sum, t) => sum + t.tax, 0);
+  const taxRows = summarizeTaxes(
+    lines.map((line, i) => ({
+      taxKind: line.product.tax_kind,
+      taxRate: lineTaxes[i].rate,
+      base: lineTaxes[i].base,
+      tax: lineTaxes[i].tax,
+    }))
+  );
   const mixedSum =
     (Number(mixed.efectivo) || 0) +
     (Number(mixed.nequi) || 0) +
@@ -653,7 +671,11 @@ export function SaleCart({
                 className="flex flex-col gap-1 rounded-[var(--radius-brand-md)] border border-brand-border bg-white p-3 text-left transition-shadow hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <p className="truncate text-sm font-medium text-brand-ink">{product.name}</p>
-                <p className="text-sm text-brand-muted">{currency.format(product.sale_price)}</p>
+                <p className="text-sm text-brand-muted">
+                  {currency.format(
+                    computeLineTax(product.sale_price, 1, product.tax_rate, taxSettings).total
+                  )}
+                </p>
                 <p className="text-xs text-brand-muted">
                   {outOfStock ? "Sin stock" : `Stock: ${product.quantity}`}
                 </p>
@@ -831,13 +853,16 @@ export function SaleCart({
             {lines.length === 0 && (
               <p className="text-sm text-brand-muted">Selecciona productos para agregarlos aquí.</p>
             )}
-            {lines.map((line) => (
+            {lines.map((line, index) => (
               <div key={line.product.id} className="flex items-center justify-between gap-2 text-sm">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-brand-ink">{line.product.name}</p>
                   <p className="text-xs text-brand-muted">
-                    {currency.format(line.product.sale_price)} c/u ·{" "}
-                    {currency.format(line.product.sale_price * line.quantity)}
+                    {currency.format(
+                      computeLineTax(line.product.sale_price, 1, line.product.tax_rate, taxSettings)
+                        .total
+                    )}{" "}
+                    c/u · {currency.format(lineTaxes[index].total)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -870,6 +895,21 @@ export function SaleCart({
                 </div>
               </div>
             ))}
+
+            {taxTotal > 0 && (
+              <div className="flex flex-col gap-1 border-t border-brand-border pt-3 text-sm text-brand-muted">
+                <div className="flex items-center justify-between">
+                  <span>Subtotal (sin impuestos)</span>
+                  <span>{currency.format(total - taxTotal)}</span>
+                </div>
+                {taxRows.map((row) => (
+                  <div key={row.label} className="flex items-center justify-between">
+                    <span>{row.label}</span>
+                    <span>{currency.format(row.tax)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="flex items-center justify-between border-t border-brand-border pt-3 font-semibold text-brand-ink">
               <span>Total</span>

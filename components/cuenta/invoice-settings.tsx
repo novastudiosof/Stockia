@@ -106,6 +106,109 @@ export function InvoiceSettings({ organization }: { organization: Organization }
                 placeholder="Ej: Gracias por su compra. No se aceptan devoluciones sin factura."
               />
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="taxDv">Dígito de verificación (DV) del NIT</Label>
+              <Input id="taxDv" name="taxDv" maxLength={2} defaultValue={organization.tax_dv ?? ""} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="billingCity">Ciudad</Label>
+              <Input
+                id="billingCity"
+                name="billingCity"
+                defaultValue={organization.billing_city ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="taxRegime">Régimen</Label>
+              <Input
+                id="taxRegime"
+                name="taxRegime"
+                defaultValue={organization.tax_regime ?? ""}
+                placeholder="Ej: Responsable de IVA, No responsable de IVA"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="taxResponsibilities">Responsabilidades fiscales</Label>
+              <Input
+                id="taxResponsibilities"
+                name="taxResponsibilities"
+                defaultValue={organization.tax_responsibilities ?? ""}
+                placeholder="Ej: O-13, O-15"
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-[var(--radius-brand-sm)] border border-brand-border p-3 sm:col-span-2">
+              <label className="flex items-start gap-2 text-sm text-brand-ink">
+                <input
+                  type="checkbox"
+                  name="taxEnabled"
+                  defaultChecked={organization.tax_enabled}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="font-medium">Manejar impuestos (IVA / impuesto al consumo)</span>
+                  <span className="block text-xs text-brand-muted">
+                    Apagado: las ventas se registran como hasta ahora. Encendido: cada producto
+                    tiene su impuesto y la venta guarda el desglose.
+                  </span>
+                </span>
+              </label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="pricesIncludeTax">Mis precios de venta</Label>
+                <select
+                  id="pricesIncludeTax"
+                  name="pricesIncludeTax"
+                  defaultValue={organization.prices_include_tax ? "included" : "excluded"}
+                  className="h-10 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+                >
+                  <option value="included">Ya incluyen el impuesto (el cliente paga el precio)</option>
+                  <option value="excluded">No incluyen el impuesto (se suma al precio)</option>
+                </select>
+                <p className="text-xs text-brand-muted">
+                  Si cambias esto, el precio final de los productos con impuesto cambia. Revisa los
+                  precios antes de vender.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="resolutionNumber">Resolución de numeración (DIAN)</Label>
+              <Input
+                id="resolutionNumber"
+                name="resolutionNumber"
+                defaultValue={organization.invoice_resolution_number ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="resolutionValidUntil">Vigente hasta</Label>
+              <Input
+                id="resolutionValidUntil"
+                name="resolutionValidUntil"
+                type="date"
+                defaultValue={organization.invoice_resolution_valid_until ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="resolutionFrom">Rango autorizado: desde</Label>
+              <Input
+                id="resolutionFrom"
+                name="resolutionFrom"
+                type="number"
+                min={0}
+                defaultValue={organization.invoice_resolution_from ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="resolutionTo">Rango autorizado: hasta</Label>
+              <Input
+                id="resolutionTo"
+                name="resolutionTo"
+                type="number"
+                min={0}
+                defaultValue={organization.invoice_resolution_to ?? ""}
+              />
+            </div>
+
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label htmlFor="logo">Logo</Label>
               <div className="flex flex-wrap items-center gap-4">

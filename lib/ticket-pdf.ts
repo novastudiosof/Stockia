@@ -24,6 +24,9 @@ export interface TicketData {
   customerPhone: string | null;
   soldBy: string | null;
   items: TicketItem[];
+  /** Solo si la venta tiene impuestos: subtotal sin impuestos y una línea por impuesto. */
+  subtotal?: string;
+  taxLines?: { label: string; amount: string }[];
   total: string;
   paymentText: string | null;
   footer: string | null;
@@ -132,6 +135,12 @@ export function buildTicketPdf(data: TicketData, widthMm: 58 | 80): Blob {
   }
 
   add(rule);
+  if (data.subtotal && data.taxLines && data.taxLines.length > 0) {
+    leftRight("Subtotal", data.subtotal, cols).forEach((l) => add(l));
+    for (const tax of data.taxLines) {
+      leftRight(tax.label, tax.amount, cols).forEach((l) => add(l));
+    }
+  }
   leftRight("TOTAL", data.total, cols).forEach((l) => add(l, { bold: true }));
   if (data.paymentText) addWrapped(`Pago: ${data.paymentText}`);
 

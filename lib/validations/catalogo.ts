@@ -19,6 +19,8 @@ export const productSchema = z.object({
   purchasePrice: z.coerce.number().min(0, "El precio de compra no puede ser negativo"),
   salePrice: z.coerce.number().min(0, "El precio de venta no puede ser negativo"),
   barcode: barcodeField,
+  // "<tipo>:<tarifa>" (ver TAX_OPTIONS). Solo llega si el negocio maneja impuestos.
+  tax: z.string().optional(),
 });
 
 // Al editar un producto ya no se puede sobrescribir la cantidad a mano: se
@@ -29,6 +31,7 @@ export const productUpdateSchema = z.object({
   purchasePrice: z.coerce.number().min(0, "El precio de compra no puede ser negativo"),
   salePrice: z.coerce.number().min(0, "El precio de venta no puede ser negativo"),
   barcode: barcodeField,
+  tax: z.string().optional(),
 });
 
 export const stockAdjustmentSchema = z.object({

@@ -6,6 +6,7 @@ import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
 import type { CustomerSnapshot, Organization, SaleItem } from "@/lib/supabase/types";
+import { summarizeTaxes } from "@/lib/tax";
 
 type Width = "58" | "80";
 
@@ -51,6 +52,9 @@ export function ThermalInvoice({
       return `${organization.currency || "COP"} ${value.toLocaleString("es-CO")}`;
     }
   };
+
+  const taxRows = summarizeTaxes(items);
+  const taxSum = taxRows.reduce((sum, row) => sum + row.tax, 0);
 
   return (
     <div>
@@ -98,8 +102,19 @@ export function ThermalInvoice({
       >
         <div className="flex flex-col items-center text-center">
           <p className="font-bold">{organization.legal_name || organization.name}</p>
-          {organization.tax_id && <p>NIT: {organization.tax_id}</p>}
-          {organization.billing_address && <p>{organization.billing_address}</p>}
+          {organization.tax_id && (
+            <p>
+              NIT: {organization.tax_id}
+              {organization.tax_dv ? `-${organization.tax_dv}` : ""}
+            </p>
+          )}
+          {organization.tax_regime && <p>{organization.tax_regime}</p>}
+          {organization.billing_address && (
+            <p>
+              {organization.billing_address}
+              {organization.billing_city ? ` - ${organization.billing_city}` : ""}
+            </p>
+          )}
           {organization.billing_phone && <p>Tel: {organization.billing_phone}</p>}
         </div>
 
@@ -112,7 +127,12 @@ export function ThermalInvoice({
 
         <div className="border-t border-dashed border-brand-muted pt-2">
           <p>Cliente: {customer?.nombre ?? "Consumidor final"}</p>
-          {customer?.documento && <p>Doc: {customer.documento}</p>}
+          {customer?.documento && (
+            <p>
+              {customer.tipo_documento ? `${customer.tipo_documento}: ` : "Doc: "}
+              {customer.documento}
+            </p>
+          )}
           {customer?.telefono && <p>Tel: {customer.telefono}</p>}
           {soldBy && <p>Vendido por: {soldBy}</p>}
         </div>
@@ -123,7 +143,10 @@ export function ThermalInvoice({
               <span>{item.name}</span>
               <div className="flex justify-between">
                 <span>
-                  {item.quantity} x {money(item.unitPrice)}
+                  {item.quantity} x{" "}
+                  {money(
+                    item.taxRate && item.taxRate > 0 ? item.subtotal / item.quantity : item.unitPrice
+                  )}
                 </span>
                 <span>{money(item.subtotal)}</span>
               </div>
@@ -131,11 +154,39 @@ export function ThermalInvoice({
           ))}
         </div>
 
+        {taxSum > 0 && (
+          <div className="flex flex-col border-t border-dashed border-brand-muted pt-2">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{money(total - taxSum)}</span>
+            </div>
+            {taxRows.map((row) => (
+              <div key={row.label} className="flex justify-between">
+                <span>{row.label}</span>
+                <span>{money(row.tax)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex justify-between border-t border-dashed border-brand-muted pt-2 font-bold">
           <span>TOTAL</span>
           <span>{money(total)}</span>
         </div>
         {paymentText && <p className="pt-1">Pago: {paymentText}</p>}
+
+        {organization.invoice_resolution_number && (
+          <p className="border-t border-dashed border-brand-muted pt-2 text-center">
+            Resolución DIAN {organization.invoice_resolution_number}
+            {organization.invoice_resolution_from != null &&
+            organization.invoice_resolution_to != null
+              ? ` · rango ${organization.invoice_prefix || ""}${organization.invoice_resolution_from} a ${organization.invoice_prefix || ""}${organization.invoice_resolution_to}`
+              : ""}
+            {organization.invoice_resolution_valid_until
+              ? ` · vigente hasta ${organization.invoice_resolution_valid_until}`
+              : ""}
+          </p>
+        )}
 
         {organization.invoice_footer && (
           <p className="border-t border-dashed border-brand-muted pt-2 text-center">

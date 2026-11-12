@@ -63,6 +63,7 @@ export async function createCliente(
 
   const parsed = clienteSchema.safeParse({
     nombre: formData.get("nombre"),
+    tipoDocumento: formData.get("tipoDocumento") ?? "",
     documento: formData.get("documento") ?? "",
     telefono: formData.get("telefono") ?? "",
     email: formData.get("email") ?? "",
@@ -74,6 +75,7 @@ export async function createCliente(
   const { error } = await supabase.from("clientes").insert({
     organization_id: profile.organization_id,
     nombre: parsed.data.nombre,
+    tipo_documento: parsed.data.tipoDocumento || null,
     documento: parsed.data.documento || null,
     telefono: parsed.data.telefono || null,
     email: parsed.data.email || null,
@@ -98,6 +100,7 @@ export async function updateCliente(
 
   const parsed = clienteSchema.safeParse({
     nombre: formData.get("nombre"),
+    tipoDocumento: formData.get("tipoDocumento") ?? "",
     documento: formData.get("documento") ?? "",
     telefono: formData.get("telefono") ?? "",
     email: formData.get("email") ?? "",
@@ -110,6 +113,7 @@ export async function updateCliente(
     .from("clientes")
     .update({
       nombre: parsed.data.nombre,
+      tipo_documento: parsed.data.tipoDocumento || null,
       documento: parsed.data.documento || null,
       telefono: parsed.data.telefono || null,
       email: parsed.data.email || null,

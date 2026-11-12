@@ -52,6 +52,24 @@ export function ClienteFormDialog({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
+              <Label htmlFor="tipoDocumento">Tipo de documento</Label>
+              <select
+                id="tipoDocumento"
+                name="tipoDocumento"
+                defaultValue={cliente?.tipo_documento ?? ""}
+                className="h-10 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+              >
+                <option value="">Sin especificar</option>
+                <option value="CC">Cédula de ciudadanía (CC)</option>
+                <option value="NIT">NIT</option>
+                <option value="CE">Cédula de extranjería (CE)</option>
+                <option value="TI">Tarjeta de identidad (TI)</option>
+                <option value="PAS">Pasaporte</option>
+                <option value="RC">Registro civil (RC)</option>
+                <option value="DIE">Documento extranjero (DIE)</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="documento">Documento</Label>
               <Input id="documento" name="documento" defaultValue={cliente?.documento ?? ""} />
             </div>

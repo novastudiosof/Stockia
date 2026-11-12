@@ -1,4 +1,5 @@
 import { requireProfile } from "@/lib/auth";
+import { getTaxSettings } from "@/lib/org-tax";
 import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { SaleCart } from "@/components/ventas-productos/sale-cart";
@@ -15,7 +16,7 @@ export default async function VentasProductosPage() {
 
   const supabase = await createClient();
 
-  const [{ data: products }, { data: sales }, drafts, { data: team }] = await Promise.all([
+  const [{ data: products }, { data: sales }, drafts, { data: team }, taxSettings] = await Promise.all([
     supabase
       .from("products")
       .select("*")
@@ -33,6 +34,7 @@ export default async function VentasProductosPage() {
       .select("id, full_name")
       .eq("organization_id", profile.organization_id)
       .order("full_name", { ascending: true }),
+    getTaxSettings(profile.organization_id),
   ]);
   const teammates = (team as { id: string; full_name: string }[]) ?? [];
 
@@ -52,6 +54,7 @@ export default async function VentasProductosPage() {
         currentUserId={profile.id}
         isAdmin={profile.role === "owner"}
         teammates={teammates}
+        taxSettings={taxSettings}
       />
 
       <div>

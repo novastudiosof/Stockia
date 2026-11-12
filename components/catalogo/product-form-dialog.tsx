@@ -14,12 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Product } from "@/lib/supabase/types";
+import { TAX_OPTIONS, taxOptionValue, type TaxSettings } from "@/lib/tax";
 
 interface ProductFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product?: Product;
   action: (prev: { error?: string } | void, formData: FormData) => Promise<{ error?: string } | void>;
+  taxSettings: TaxSettings;
 }
 
 export function ProductFormDialog({
@@ -27,6 +29,7 @@ export function ProductFormDialog({
   onOpenChange,
   product,
   action,
+  taxSettings,
 }: ProductFormDialogProps) {
   const formRef = React.useRef<HTMLFormElement>(null);
 
@@ -79,7 +82,11 @@ export function ProductFormDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="salePrice">Precio de venta</Label>
+              <Label htmlFor="salePrice">
+                Precio de venta
+                {taxSettings.taxEnabled &&
+                  (taxSettings.pricesIncludeTax ? " (con impuesto incluido)" : " (sin impuesto)")}
+              </Label>
               <Input
                 id="salePrice"
                 name="salePrice"
@@ -90,6 +97,28 @@ export function ProductFormDialog({
                 required
               />
             </div>
+            {taxSettings.taxEnabled && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="tax">Impuesto</Label>
+                <select
+                  id="tax"
+                  name="tax"
+                  defaultValue={taxOptionValue(product?.tax_kind, product?.tax_rate)}
+                  className="h-10 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+                >
+                  {TAX_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-brand-muted">
+                  {taxSettings.pricesIncludeTax
+                    ? "El precio ya incluye el impuesto; al vender se separa del valor."
+                    : "El impuesto se suma al precio al vender."}
+                </p>
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="barcode">Código de barras</Label>
               <Input id="barcode" name="barcode" defaultValue={product?.barcode ?? ""} />

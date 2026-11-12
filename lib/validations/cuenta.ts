@@ -35,6 +35,20 @@ export const invoiceSettingsSchema = z.object({
     .toUpperCase()
     .regex(/^[A-Z]{3}$/, "Usa un código de moneda de 3 letras (ej: COP, USD)"),
   invoicePrefix: z.string().trim().max(12).optional().or(z.literal("")),
+  taxEnabled: z.boolean(),
+  pricesIncludeTax: z.boolean(),
+  taxDv: z.string().trim().max(2).optional().or(z.literal("")),
+  taxRegime: z.string().trim().max(60).optional().or(z.literal("")),
+  billingCity: z.string().trim().max(80).optional().or(z.literal("")),
+  taxResponsibilities: z.string().trim().max(200).optional().or(z.literal("")),
+  resolutionNumber: z.string().trim().max(40).optional().or(z.literal("")),
+  resolutionFrom: z.coerce.number().int().min(0).max(999999999).optional().or(z.literal("")),
+  resolutionTo: z.coerce.number().int().min(0).max(999999999).optional().or(z.literal("")),
+  resolutionValidUntil: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de vigencia inválida")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const ALLOWED_LOGO_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];

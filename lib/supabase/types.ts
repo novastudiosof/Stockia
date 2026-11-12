@@ -30,6 +30,18 @@ export type Organization = {
   logo_url: string | null;
   business_type: string;
   theme_color: string | null;
+  /** Maneja IVA / impuesto al consumo (apagado por defecto). */
+  tax_enabled: boolean;
+  /** true: el precio ya incluye el impuesto; false: se suma encima. */
+  prices_include_tax: boolean;
+  tax_dv: string | null;
+  tax_regime: string | null;
+  billing_city: string | null;
+  tax_responsibilities: string | null;
+  invoice_resolution_number: string | null;
+  invoice_resolution_from: number | null;
+  invoice_resolution_to: number | null;
+  invoice_resolution_valid_until: string | null;
   created_at: string;
 };
 
@@ -79,6 +91,8 @@ export type Product = {
   purchase_price: number;
   sale_price: number;
   barcode: string | null;
+  tax_kind: "iva" | "consumo" | "exento" | "excluido";
+  tax_rate: number;
   created_at: string;
   updated_at: string;
 };
@@ -100,6 +114,7 @@ export type Cliente = {
   id: string;
   organization_id: string;
   nombre: string;
+  tipo_documento: string | null;
   documento: string | null;
   telefono: string | null;
   email: string | null;
@@ -110,6 +125,7 @@ export type Cliente = {
 
 export type CustomerSnapshot = {
   nombre: string;
+  tipo_documento?: string | null;
   documento: string | null;
   telefono: string | null;
   email: string | null;
@@ -170,6 +186,11 @@ export type SaleItem = {
   unitPrice: number;
   quantity: number;
   subtotal: number;
+  /** Impuesto (solo si el negocio lo tenía activo al vender). */
+  taxKind?: "iva" | "consumo" | "exento" | "excluido" | null;
+  taxRate?: number;
+  base?: number;
+  tax?: number;
   /** Precio de compra al vender (lo agrega un trigger; ventas viejas: estimado). */
   unitCost?: number;
 };
@@ -204,6 +225,7 @@ export type Sale = {
   organization_id: string;
   items: SaleItem[];
   total: number;
+  tax_total: number;
   created_by: string | null;
   created_at: string;
   voided_at: string | null;

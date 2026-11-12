@@ -156,8 +156,26 @@ export async function updateMyInvoiceSettings(
     invoiceFooter: formData.get("invoiceFooter") ?? "",
     currency: formData.get("currency") || "COP",
     invoicePrefix: formData.get("invoicePrefix") ?? "",
+    taxEnabled: formData.get("taxEnabled") === "on",
+    pricesIncludeTax: formData.get("pricesIncludeTax") !== "excluded",
+    taxDv: formData.get("taxDv") ?? "",
+    taxRegime: formData.get("taxRegime") ?? "",
+    billingCity: formData.get("billingCity") ?? "",
+    taxResponsibilities: formData.get("taxResponsibilities") ?? "",
+    resolutionNumber: formData.get("resolutionNumber") ?? "",
+    resolutionFrom: formData.get("resolutionFrom") ?? "",
+    resolutionTo: formData.get("resolutionTo") ?? "",
+    resolutionValidUntil: formData.get("resolutionValidUntil") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  const { resolutionFrom, resolutionTo } = parsed.data;
+  if (
+    typeof resolutionFrom === "number" &&
+    typeof resolutionTo === "number" &&
+    resolutionTo < resolutionFrom
+  ) {
+    return { error: 'El rango de la resolución es inválido: el "hasta" es menor que el "desde"' };
+  }
 
   const admin = createAdminClient();
 
@@ -191,11 +209,24 @@ export async function updateMyInvoiceSettings(
       invoice_footer: parsed.data.invoiceFooter || null,
       currency: parsed.data.currency,
       invoice_prefix: parsed.data.invoicePrefix || "",
+      tax_enabled: parsed.data.taxEnabled,
+      prices_include_tax: parsed.data.pricesIncludeTax,
+      tax_dv: parsed.data.taxDv || null,
+      tax_regime: parsed.data.taxRegime || null,
+      billing_city: parsed.data.billingCity || null,
+      tax_responsibilities: parsed.data.taxResponsibilities || null,
+      invoice_resolution_number: parsed.data.resolutionNumber || null,
+      invoice_resolution_from: typeof resolutionFrom === "number" ? resolutionFrom : null,
+      invoice_resolution_to: typeof resolutionTo === "number" ? resolutionTo : null,
+      invoice_resolution_valid_until: parsed.data.resolutionValidUntil || null,
       ...(logoUrl ? { logo_url: logoUrl } : {}),
     })
     .eq("id", organizationId);
   if (error) {
-    return { error: friendlyDbError(error, "updateMyInvoiceSettings", "No se pudieron guardar los datos de facturación") };
+    return { error: friendlyDbError(error, "updateMyInvoiceSettings", "No se pudieron guardar los datos de facturación", {
+      PGRST204: "Falta ejecutar la migración 023 en Supabase",
+      "42703": "Falta ejecutar la migración 023 en Supabase",
+    }) };
   }
 
   await logActivity(profile, "Actualizó datos de facturación", organizationId);
