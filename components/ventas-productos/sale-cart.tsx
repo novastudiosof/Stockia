@@ -43,6 +43,8 @@ interface CartLine {
 
 interface SaleCartProps {
   products: Product[];
+  /** Categorías del negocio, para filtrar los productos. */
+  categories: { id: string; name: string }[];
   /** Si el módulo Clientes no está activo, solo se vende a "Consumidor final". */
   clientesEnabled: boolean;
   /** Ventas en espera de la organización (las ven todos los usuarios). */
@@ -82,6 +84,7 @@ const EMPTY_MIXED = { efectivo: "", nequi: "", daviplata: "", llave: "" };
 
 export function SaleCart({
   products,
+  categories,
   clientesEnabled,
   initialDrafts,
   currentUserId,
@@ -91,6 +94,10 @@ export function SaleCart({
 }: SaleCartProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
+  // Categoría elegida ("all" = todas). Solo filtra la lista; el carrito no cambia.
+  const [categoryId, setCategoryId] = React.useState<string>("all");
+  // En celular el panel de la venta es una hoja que sube desde abajo.
+  const [sheetOpen, setSheetOpen] = React.useState(false);
   const [cart, setCart] = React.useState<Record<string, CartLine>>({});
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -132,10 +139,15 @@ export function SaleCart({
 
   const term = search.toLowerCase();
   const filtered = products.filter(
-    (p) => p.name.toLowerCase().includes(term) || (p.barcode ?? "").toLowerCase().includes(term)
+    (p) =>
+      (categoryId === "all" || p.category_id === categoryId) &&
+      (p.name.toLowerCase().includes(term) || (p.barcode ?? "").toLowerCase().includes(term))
   );
+  // Solo se ofrecen las categorías que tienen productos.
+  const visibleCategories = categories.filter((c) => products.some((p) => p.category_id === c.id));
 
   const lines = Object.values(cart);
+  const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
   // Mismo cálculo que create_sale() en la base de datos (que es el oficial).
   const lineTaxes = lines.map((line) =>
     computeLineTax(line.product.sale_price, line.quantity, line.product.tax_rate, taxSettings)
@@ -196,6 +208,21 @@ export function SaleCart({
       looksLikeDocument ? { ...c, documento: trimmedQuery } : { ...c, nombre: trimmedQuery }
     );
   }, [customerNotFound, trimmedQuery]);
+
+  // Hoja de la venta en celular: Escape la cierra y el fondo no se desplaza.
+  React.useEffect(() => {
+    if (!sheetOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSheetOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [sheetOpen]);
 
   function selectCustomerMode(mode: CustomerMode) {
     setCustomerMode(mode);
@@ -641,7 +668,7 @@ export function SaleCart({
         </div>
       )}
 
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 pb-20 lg:grid-cols-3 lg:pb-0">
       <div className="flex flex-col gap-4 lg:col-span-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />
@@ -652,6 +679,31 @@ export function SaleCart({
             className="pl-9"
           />
         </div>
+
+        {visibleCategories.length > 0 && (
+          <div
+            role="tablist"
+            aria-label="Categorías"
+            className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:flex-wrap lg:overflow-visible"
+          >
+            {[{ id: "all", name: "Todas" }, ...visibleCategories].map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                role="tab"
+                aria-selected={categoryId === category.id}
+                onClick={() => setCategoryId(category.id)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  categoryId === category.id
+                    ? "border-brand bg-brand text-brand-ink"
+                    : "border-brand-border bg-white text-brand-muted hover:text-brand-ink"
+                }`}
+              >
+                {category.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {filtered.length === 0 && (
@@ -685,7 +737,32 @@ export function SaleCart({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+      {/* Fondo oscuro de la hoja (solo celular). */}
+      {sheetOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setSheetOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Panel de la venta: en PC queda fijo a la derecha y se desplaza por sí
+          solo si es más alto que la pantalla; en celular es una hoja que sube
+          desde abajo. */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] flex-col gap-4 overflow-y-auto rounded-t-2xl bg-brand-surface p-4 shadow-2xl transition-transform duration-300 ${
+          sheetOpen ? "translate-y-0" : "invisible translate-y-full"
+        } lg:visible lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-4 lg:z-auto lg:max-h-[calc(100vh-2rem)] lg:translate-y-0 lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none`}
+        role={sheetOpen ? "dialog" : undefined}
+        aria-label="Venta"
+      >
+        <div className="flex items-center justify-between lg:hidden">
+          <p className="text-base font-semibold text-brand-ink">Venta</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => setSheetOpen(false)}>
+            Seguir agregando
+          </Button>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -1042,6 +1119,29 @@ export function SaleCart({
           </CardContent>
         </Card>
       </div>
+
+      {/* Barra inferior (solo celular): resumen de la venta y acceso al panel. */}
+      {!sheetOpen && (lines.length > 0 || success) && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-brand-border bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] lg:hidden">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-brand-muted">
+                {lines.length > 0
+                  ? `${itemCount} ${itemCount === 1 ? "producto" : "productos"}`
+                  : "Venta registrada"}
+              </p>
+              {lines.length > 0 && (
+                <p className="truncate text-base font-semibold text-brand-ink">
+                  {currency.format(total)}
+                </p>
+              )}
+            </div>
+            <Button type="button" onClick={() => setSheetOpen(true)}>
+              {lines.length > 0 ? "Continuar →" : "Ver factura"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
     </div>
   );

@@ -16,10 +16,15 @@ export default async function VentasProductosPage() {
 
   const supabase = await createClient();
 
-  const [{ data: products }, { data: sales }, drafts, { data: team }, taxSettings] = await Promise.all([
+  const [{ data: products }, { data: categories }, { data: sales }, drafts, { data: team }, taxSettings] = await Promise.all([
     supabase
       .from("products")
       .select("*")
+      .eq("organization_id", profile.organization_id)
+      .order("name", { ascending: true }),
+    supabase
+      .from("categories")
+      .select("id, name")
       .eq("organization_id", profile.organization_id)
       .order("name", { ascending: true }),
     supabase
@@ -49,6 +54,7 @@ export default async function VentasProductosPage() {
 
       <SaleCart
         products={(products as Product[]) ?? []}
+        categories={(categories as { id: string; name: string }[]) ?? []}
         clientesEnabled={clientesEnabled}
         initialDrafts={drafts}
         currentUserId={profile.id}
