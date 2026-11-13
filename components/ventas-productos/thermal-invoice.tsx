@@ -71,7 +71,7 @@ export function ThermalInvoice({
           body * { visibility: hidden; }
           .ticket-print, .ticket-print * { visibility: visible; }
           .ticket-print {
-            position: absolute; top: 0; left: 0; margin: 0 !important;
+            position: absolute; top: 0; left: ${width === "58" ? "5mm" : "0"}; margin: 0 !important;
             width: ${printable}mm !important; box-sizing: border-box;
             padding: ${width === "58" ? "1mm" : "2mm"} !important;
             border: none; overflow-wrap: anywhere; word-break: break-word;
