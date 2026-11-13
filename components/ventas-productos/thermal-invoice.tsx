@@ -53,6 +53,10 @@ export function ThermalInvoice({
     }
   };
 
+  // Ancho que de verdad imprime la cabeza térmica: 58mm de papel = 48mm útiles
+  // (384 puntos); 80mm de papel = 72mm útiles. Más que eso se corta a la derecha.
+  const printable = width === "58" ? 47 : 72;
+
   const taxRows = summarizeTaxes(items);
   const taxSum = taxRows.reduce((sum, row) => sum + row.tax, 0);
 
@@ -68,11 +72,14 @@ export function ThermalInvoice({
           .ticket-print, .ticket-print * { visibility: visible; }
           .ticket-print {
             position: absolute; top: 0; left: 0; margin: 0 !important;
-            width: ${width}mm !important; box-sizing: border-box;
-            padding: ${width === "58" ? "1.5mm" : "3mm"} !important;
+            width: ${printable}mm !important; box-sizing: border-box;
+            padding: ${width === "58" ? "1mm" : "2mm"} !important;
             border: none; overflow-wrap: anywhere; word-break: break-word;
-            font-size: ${width === "58" ? "10px" : "11px"};
+            font-size: ${width === "58" ? "11px" : "12px"};
+            font-weight: 600; color: #000 !important; background: #fff;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
+          .ticket-print * { color: #000 !important; border-color: #000 !important; }
           .ticket-print span { min-width: 0; }
           .no-print { display: none !important; }
         }
@@ -106,7 +113,7 @@ export function ThermalInvoice({
 
       <div
         className="ticket-print mx-auto flex flex-col gap-2 border border-dashed border-brand-border bg-white p-3 font-mono text-[11px] leading-snug text-brand-ink"
-        style={{ width: `${width}mm`, fontSize: width === "58" ? "10px" : undefined }}
+        style={{ width: `${printable}mm`, fontSize: width === "58" ? "11px" : undefined }}
       >
         <div className="flex flex-col items-center text-center">
           <p className="font-bold">{organization.legal_name || organization.name}</p>
