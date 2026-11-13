@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { voidSale, searchSales } from "@/lib/actions/ventas-productos";
 import { paymentLabel } from "@/lib/payments";
+import { todayBogota } from "@/lib/dates";
 import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
 import { WhatsappInvoiceButton } from "@/components/ventas-productos/whatsapp-invoice-button";
 import type { Sale } from "@/lib/supabase/types";
@@ -56,8 +57,41 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
   const [filteredSales, setFilteredSales] = React.useState<Sale[] | null>(null);
   const [searchError, setSearchError] = React.useState<string | null>(null);
 
+  // Por defecto solo se muestran las ventas de hoy (vienen de la página);
+  // "Ver más" trae los últimos 7 días y las fechas sirven para otros días.
+  const [showWeek, setShowWeek] = React.useState(false);
+  const [weekSales, setWeekSales] = React.useState<Sale[] | null>(null);
+  const [loadingWeek, setLoadingWeek] = React.useState(false);
+
   const hasFilters = query.trim() !== "" || from !== "" || to !== "";
-  const displayedSales = filteredSales ?? sales;
+  const displayedSales = filteredSales ?? (showWeek && weekSales ? weekSales : sales);
+
+  // Tras anular o devolver, la página recarga las ventas de hoy: se vuelve a
+  // la vista de hoy para no dejar la semana desactualizada.
+  React.useEffect(() => {
+    setShowWeek(false);
+    setWeekSales(null);
+  }, [sales]);
+
+  async function loadWeek() {
+    setLoadingWeek(true);
+    setSearchError(null);
+    // Hoy y los 6 días anteriores, en hora de Colombia.
+    const start = new Date(`${todayBogota()}T00:00:00Z`);
+    start.setUTCDate(start.getUTCDate() - 6);
+    const { results, error: fetchError } = await searchSales({
+      query: "",
+      from: start.toISOString().slice(0, 10),
+      to: "",
+    });
+    setLoadingWeek(false);
+    if (fetchError) {
+      setSearchError(fetchError);
+      return;
+    }
+    setWeekSales(results);
+    setShowWeek(true);
+  }
 
   React.useEffect(() => {
     if (!hasFilters) {
@@ -149,11 +183,21 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
       {filtering && <p className="text-sm text-brand-muted">Buscando...</p>}
       {searchError && <p className="text-sm text-brand-danger">{searchError}</p>}
 
+      <p className="text-sm font-medium text-brand-muted">
+        {hasFilters
+          ? "Resultados de la búsqueda"
+          : showWeek
+            ? "Ventas de los últimos 7 días"
+            : "Ventas de hoy"}
+      </p>
+
       {displayedSales.length === 0 ? (
         <div className="rounded-[var(--radius-brand-md)] border border-dashed border-brand-border bg-white p-8 text-center text-sm text-brand-muted">
           {hasFilters
             ? "No hay ventas que coincidan con la búsqueda."
-            : "Aún no has registrado ventas por este medio."}
+            : showWeek
+              ? "No hay ventas en los últimos 7 días."
+              : "Hoy aún no has registrado ventas."}
         </div>
       ) : (
         displayedSales.map((sale) => (
@@ -232,6 +276,23 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
             </ul>
           </div>
         ))
+      )}
+
+      {!hasFilters && (
+        <div className="flex flex-col items-center gap-1">
+          {showWeek ? (
+            <Button variant="outline" onClick={() => setShowWeek(false)}>
+              Ver solo las de hoy
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={loadWeek} disabled={loadingWeek}>
+              {loadingWeek ? "Cargando..." : "Ver más: últimos 7 días"}
+            </Button>
+          )}
+          <p className="text-xs text-brand-muted">
+            Para otro día o un rango, usa las fechas de arriba.
+          </p>
+        </div>
       )}
 
       {canVoid && (

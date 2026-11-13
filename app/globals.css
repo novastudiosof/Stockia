@@ -135,7 +135,11 @@ body {
 .animate-glow { animation: glow-pulse 4s ease-in-out infinite; }
 
 /* Contenido de cada página: entra suave al navegar (ver app/dashboard/template.tsx). */
-.page-enter { animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* "backwards" y no "both": con "both" el contenedor se queda con una
+   transformación activa y los elementos position:fixed de la página (como la
+   barra inferior de Ventas por Productos) se anclan al final de la página en
+   vez de a la pantalla. */
+.page-enter { animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* ---- Fondo del login ---------------------------------------------------- */
 .login-bg {

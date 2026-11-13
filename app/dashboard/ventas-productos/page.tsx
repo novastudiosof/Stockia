@@ -1,5 +1,6 @@
 import { requireProfile } from "@/lib/auth";
 import { getTaxSettings } from "@/lib/org-tax";
+import { todayBogota } from "@/lib/dates";
 import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { SaleCart } from "@/components/ventas-productos/sale-cart";
@@ -31,8 +32,11 @@ export default async function VentasProductosPage() {
       .from("sales")
       .select("*")
       .eq("organization_id", profile.organization_id)
+      // Solo las ventas de hoy (día en hora de Colombia, igual que el cierre de
+      // caja); las de otros días se piden desde "Ver más".
+      .gte("created_at", `${todayBogota()}T00:00:00-05:00`)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(200),
     listSaleDrafts(),
     supabase
       .from("profiles")
@@ -64,7 +68,7 @@ export default async function VentasProductosPage() {
       />
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-brand-ink">Ventas recientes</h2>
+        <h2 className="mb-3 text-lg font-semibold text-brand-ink">Historial de ventas</h2>
         <SalesHistory sales={(sales as Sale[]) ?? []} canVoid={profile.role === "owner"} />
       </div>
     </div>
