@@ -61,11 +61,19 @@ export function ThermalInvoice({
       {/* @page controla el tamaño de página real al imprimir/guardar como
           PDF; se regenera cada vez que cambia el ancho elegido. */}
       <style>{`
-        @page { size: ${width}mm auto; margin: 2mm; }
+        @page { size: ${width}mm auto; margin: 0; }
         @media print {
+          html, body { margin: 0 !important; padding: 0 !important; width: ${width}mm; }
           body * { visibility: hidden; }
           .ticket-print, .ticket-print * { visibility: visible; }
-          .ticket-print { position: absolute; top: 0; left: 0; border: none; }
+          .ticket-print {
+            position: absolute; top: 0; left: 0; margin: 0 !important;
+            width: ${width}mm !important; box-sizing: border-box;
+            padding: ${width === "58" ? "1.5mm" : "3mm"} !important;
+            border: none; overflow-wrap: anywhere; word-break: break-word;
+            font-size: ${width === "58" ? "10px" : "11px"};
+          }
+          .ticket-print span { min-width: 0; }
           .no-print { display: none !important; }
         }
       `}</style>
@@ -98,7 +106,7 @@ export function ThermalInvoice({
 
       <div
         className="ticket-print mx-auto flex flex-col gap-2 border border-dashed border-brand-border bg-white p-3 font-mono text-[11px] leading-snug text-brand-ink"
-        style={{ width: `${width}mm` }}
+        style={{ width: `${width}mm`, fontSize: width === "58" ? "10px" : undefined }}
       >
         <div className="flex flex-col items-center text-center">
           <p className="font-bold">{organization.legal_name || organization.name}</p>

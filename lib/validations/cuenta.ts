@@ -22,6 +22,13 @@ export const createAuxiliarSchema = z.object({
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
 });
 
+// Campo numerico opcional: vacio = sin valor (z.coerce.number() convertiria "" en 0).
+const optionalInt = () =>
+  z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().min(0).max(999999999).optional()
+  );
+
 export const invoiceSettingsSchema = z.object({
   legalName: z.string().trim().max(160).optional().or(z.literal("")),
   taxId: z.string().trim().max(40).optional().or(z.literal("")),
@@ -42,8 +49,8 @@ export const invoiceSettingsSchema = z.object({
   billingCity: z.string().trim().max(80).optional().or(z.literal("")),
   taxResponsibilities: z.string().trim().max(200).optional().or(z.literal("")),
   resolutionNumber: z.string().trim().max(40).optional().or(z.literal("")),
-  resolutionFrom: z.coerce.number().int().min(0).max(999999999).optional().or(z.literal("")),
-  resolutionTo: z.coerce.number().int().min(0).max(999999999).optional().or(z.literal("")),
+  resolutionFrom: optionalInt(),
+  resolutionTo: optionalInt(),
   resolutionValidUntil: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de vigencia inválida")

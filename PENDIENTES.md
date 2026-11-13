@@ -2,16 +2,16 @@
 
 Última actualización: 2026-11-08. Organización de pruebas: PET SHOP ANIMAL HOME (trabajar solo sobre esa).
 
-## Hecho en código, sin commit ni probar (2026-11-08)
+## Devoluciones, ventas en espera y Mi Cuenta (2026-11-08) — subido a GitHub, migraciones 019–021 corridas en Supabase; falta probar en producción
 - [ ] **Color de la página y Datos de facturación pasaron de Super Admin a Mi Cuenta** (solo administrador). Tipo de negocio sigue en Super Admin. Acciones `updateMyThemeColor` y `updateMyInvoiceSettings` en `lib/actions/cuenta.ts` (usan service role porque RLS de organizations es solo super admin).
 - [ ] **Devoluciones**: botón en el historial de Ventas por Productos (solo administrador). Devuelve la venta completa, regresa stock y la saca de informes. Si el cliente conserva productos, se registra de nuevo la venta con esos. **Correr migración 019 (`sql/019_devoluciones.sql`) antes de desplegar.** **Migración 021** (`sql/021_devoluciones_en_su_dia.sql`): la devolución se descuenta en el día en que se hace (caja, ventas del día, utilidad, por el mismo medio de pago), sin tocar el día original ni exigir reabrir su caja. Requiere la caja de HOY abierta. Las anulaciones siguen igual (solo antes del cierre del día de la venta). Probada en un Postgres en memoria; falta probar en producción: devolver una venta de hace días y revisar cierre de caja, Ventas y Gastos e Informes → Utilidad.
 - [ ] **Ventas en espera (borrador compartido)**: el carrito se guarda solo en la base (migración **020_borradores_venta.sql**, correr antes de desplegar). Cada venta tiene un responsable; todos ven quién la inició y quién la tiene, solo el responsable la edita; se puede pasar a otro usuario o el administrador la toma. Se borra al confirmar la venta y a los 3 días. Probar con dos usuarios a la vez.
 
-## Actualización de dependencias (2026-11-11, sin commit ni desplegar)
+## Actualización de dependencias (2026-11-11) — subido (commit 44ff4a1)
 - [ ] Next 16.3.5 → 16.4.6 (y eslint-config-next), zod 4.6.7, sharp 0.35.5 y brace-expansion vía `npm audit fix`. `tsc`, `eslint` y `next build` pasan. Queda 1 aviso moderado (`uuid` dentro de `exceljs`; su "arreglo" bajaría exceljs a 3.4.0, se descartó). Probar en local flujos principales antes de desplegar.
-- [ ] **Migraciones 022 y 023**: correr en Supabase junto con 019–021, en orden, antes de desplegar.
+- [x] **Migraciones 022 y 023**: el usuario las corrió en Supabase el 2026-11-11, antes del push.
 
-## Impuestos y datos fiscales (preparación para factura electrónica) — 2026-11-11, sin commit ni desplegar
+## Impuestos y datos fiscales (preparación para factura electrónica) — 2026-11-11, subido (commit 2ac942b); falta probar en la app
 Hecho en código y probado en un Postgres local (001–023 + ventas, devolución y utilidad con cifras); falta probar en la app y en producción.
 - [ ] **Todo apagado por defecto.** En Mi Cuenta → Datos de facturación el administrador activa "Manejar impuestos" y elige si sus precios YA incluyen el impuesto o se suman encima (opción por negocio). Mientras esté apagado, nada cambia.
 - [ ] **Impuesto por producto** (Catálogo, solo si el negocio lo activó): sin impuesto (excluido), exento, IVA 5% / 19%, impuesto al consumo 4% / 8% / 16%. Los productos existentes quedan en "sin impuesto".
@@ -21,6 +21,12 @@ Hecho en código y probado en un Postgres local (001–023 + ventas, devolución
 - [ ] Datos fiscales del negocio (DV, régimen, ciudad, responsabilidades, resolución con rango y vigencia) y tipo de documento del cliente (módulo Clientes).
 - Por ahora NO hace: enviar a la DIAN ni al proveedor tecnológico, CUFE/QR, notas crédito, validar rango/vigencia de la resolución al vender. Tampoco: tipo de documento al crear un cliente nuevo desde la venta (solo en el módulo Clientes), importación masiva con impuesto (entra "sin impuesto"), buscador del catálogo muestra el precio base.
 - Probar: activar impuestos en una organización de prueba, poner IVA a un producto, vender (con precios incluidos y sin incluir), imprimir/PDF, devolver esa venta, revisar Informes → Utilidad y cierre de caja.
+
+## 2026-11-13: arreglos de la revisión + impresión 58mm — subido
+- [ ] `lib/validations/cuenta.ts`: el rango de la resolución DIAN vacío se guardaba como 0 (z.coerce.number convierte "" en 0); ahora vacío = sin valor. Si alguien ya guardó Datos de facturación con esos campos vacíos, quedaron en 0: abrir Mi Cuenta, dejarlos en blanco y guardar.
+- [ ] `components/informes/ventas-productos-report-card.tsx`: el detalle mostraba el precio unitario sin impuesto junto a un subtotal con impuesto; ahora muestra el precio final por unidad.
+- [ ] `thermal-invoice.tsx`: impresión 58mm ajustada (@page sin margen, ticket al ancho exacto del papel, relleno y letra menores, corte de palabras largas). Falta probar en la impresora de 58mm real (en el diálogo de impresión: márgenes "ninguno" y sin encabezados/pies de página).
+- Riesgos menores conocidos (no tocados): total del carrito usa la config de impuestos del momento de cargar la página (recargar si el admin la cambia); si falla solo el guardado del impuesto al crear un producto, el producto queda creado y reintentar choca por código de barras; el buscador del catálogo muestra el precio base.
 
 ## Por confirmar con el usuario (probar en producción)
 - [ ] **Migración 018** (`sql/018_corrige_profit_by_product.sql`): confirmar que "Calcular ganancia" en Informes → Utilidad ya funciona.

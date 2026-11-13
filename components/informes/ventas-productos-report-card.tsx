@@ -57,7 +57,7 @@ function SaleDetail({ saleId }: { saleId: string }) {
           <li key={item.productId} className="flex justify-between gap-3">
             <span className="min-w-0 truncate">
               {item.quantity} × {item.name}
-              <span className="text-brand-muted"> ({currency.format(item.unitPrice)} c/u)</span>
+              <span className="text-brand-muted"> ({currency.format(item.taxRate && item.taxRate > 0 ? item.subtotal / item.quantity : item.unitPrice)} c/u)</span>
             </span>
             <span className="shrink-0 font-medium">{currency.format(item.subtotal)}</span>
           </li>
