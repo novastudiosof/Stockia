@@ -3,6 +3,14 @@ import { getEnabledModuleKeys, MODULE_KEYS } from "@/lib/modules";
 import { Sidebar, type SidebarNavItem } from "@/components/sidebar";
 import { BrandFooter } from "@/components/brand-footer";
 import { darken, isHexColor } from "@/lib/theme";
+import { createClient } from "@/lib/supabase/server";
+
+/** Productos por agotarse o agotados (0 si falta la migración 027). */
+async function getLowStockCount(): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("low_stock_count");
+  return error ? 0 : Number(data ?? 0);
+}
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super administrador",
@@ -21,13 +29,14 @@ export default async function DashboardLayout({
 
   // Módulos y datos de la organización se piden a la vez (y la página reutiliza
   // la misma consulta de módulos), en vez de uno detrás de otro.
-  const [enabledKeys, org] =
+  const [enabledKeys, org, lowStock] =
     profile.organization_id && !isSuperAdmin
       ? await Promise.all([
           getEnabledModuleKeys(profile.organization_id),
           getCurrentOrganization(profile.organization_id),
+          getLowStockCount(),
         ])
-      : [new Set<string>(), null];
+      : [new Set<string>(), null, 0];
 
   const logoUrl: string | null = org?.logo_url ?? null;
   const themeColor: string | null = isHexColor(org?.theme_color) ? org.theme_color : null;
@@ -41,7 +50,13 @@ export default async function DashboardLayout({
   if (isSuperAdmin) {
     items.push({ href: "/superadmin", label: "Organizaciones", icon: "superadmin" });
   } else {
-    items.push({ href: "/dashboard/catalogo", label: "Catálogo", icon: "catalogo" });
+    items.push({
+      href: "/dashboard/catalogo",
+      label: "Catálogo",
+      icon: "catalogo",
+      badge: lowStock,
+      badgeLabel: `${lowStock} productos por agotarse o agotados`,
+    });
     // Ventas y Gastos (incluido el cierre de caja) es solo del administrador;
     // los auxiliares registran ventas desde Ventas por Productos.
     if (profile.role === "owner") {
@@ -70,8 +85,23 @@ export default async function DashboardLayout({
       icon: "clientes",
       locked: !isModuleEnabled(MODULE_KEYS.CLIENTES),
     });
+    // Cartera (fiado): se muestra si el negocio activó el fiado en Mi Cuenta.
+    if (org?.payment_methods?.includes("credito")) {
+      items.push({
+        href: "/dashboard/cartera",
+        label: "Cartera",
+        icon: "cartera",
+        locked: !isModuleEnabled(MODULE_KEYS.CLIENTES),
+      });
+    }
 
     if (profile.role === "owner") {
+      items.push({
+        href: "/dashboard/compras",
+        label: "Compras",
+        icon: "compras",
+        locked: !isModuleEnabled(MODULE_KEYS.COMPRAS),
+      });
       items.push({
         href: "/dashboard/actividad",
         label: "Registro de Actividad",

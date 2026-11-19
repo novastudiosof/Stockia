@@ -13,10 +13,22 @@ const DRAFT_MAX_AGE_DAYS = 3;
 
 const text = (max: number) => z.string().max(max);
 
+const draftDiscountSchema = z
+  .object({ type: z.enum(["pct", "amount"]), value: text(20) })
+  .nullable()
+  .optional();
+
 const draftStateSchema = z.object({
   lines: z
-    .array(z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1).max(100000) }))
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().int().min(1).max(100000),
+        discount: draftDiscountSchema,
+      })
+    )
     .max(300),
+  globalDiscount: draftDiscountSchema,
   customerMode: z.enum(["none", "existing", "new"]),
   selectedCustomer: z
     .object({
@@ -28,6 +40,8 @@ const draftStateSchema = z.object({
       telefono: text(60).nullable(),
       email: text(200).nullable(),
       direccion: text(300).nullable(),
+      credit_limit: z.number().nullable().default(null),
+      credit_days: z.number().int().nullable().default(null),
       created_at: text(40),
       updated_at: text(40),
     })
@@ -41,13 +55,16 @@ const draftStateSchema = z.object({
   customerEmail: text(200),
   whatsapp: text(60),
   cashReceived: text(20),
-  payMethod: z.enum(["efectivo", "transferencia", "mixto"]),
+  payMethod: z.enum(["efectivo", "transferencia", "tarjeta", "otro", "credito", "mixto"]),
   channel: z.enum(["nequi", "daviplata", "llave"]),
   mixed: z.object({
     efectivo: text(20),
     nequi: text(20),
     daviplata: text(20),
     llave: text(20),
+    tarjeta: text(20).optional(),
+    otro: text(20).optional(),
+    credito: text(20).optional(),
   }),
 });
 

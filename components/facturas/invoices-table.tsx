@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Download, Eye, Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,18 +18,28 @@ const currency = new Intl.NumberFormat("es-CO", {
 /** Una factura/soporte: puede venir de un gasto con adjunto o ser una factura antigua. */
 export interface InvoiceRow {
   id: string;
-  source: "gasto" | "factura";
+  source: "gasto" | "factura" | "compra";
   title: string;
   subtitle: string;
   date: string;
   amount: number;
   filePath: string | null;
+  /** Enlace al registro de origen (p. ej. el detalle de la compra). */
+  href?: string;
 }
+
+const SOURCE_LABEL: Record<InvoiceRow["source"], string> = {
+  gasto: "Gasto",
+  factura: "Factura",
+  compra: "Compra",
+};
 
 export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
   const [search, setSearch] = React.useState("");
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
+  const [source, setSource] = React.useState<"" | InvoiceRow["source"]>("");
+  const sources = Array.from(new Set(rows.map((r) => r.source)));
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -38,6 +49,7 @@ export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
       (!term ||
         row.title.toLowerCase().includes(term) ||
         row.subtitle.toLowerCase().includes(term)) &&
+      (!source || row.source === source) &&
       (!from || row.date >= from) &&
       (!to || row.date <= to)
   );
@@ -76,6 +88,21 @@ export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
             className="pl-9"
           />
         </div>
+        {sources.length > 1 && (
+          <select
+            aria-label="Origen"
+            value={source}
+            onChange={(e) => setSource(e.target.value as "" | InvoiceRow["source"])}
+            className="h-10 rounded-[var(--radius-brand-sm)] border border-brand-border bg-white px-3 text-sm"
+          >
+            <option value="">Todos los orígenes</option>
+            {sources.map((s) => (
+              <option key={s} value={s}>
+                {SOURCE_LABEL[s]}
+              </option>
+            ))}
+          </select>
+        )}
         <Input
           type="date"
           aria-label="Desde"
@@ -117,13 +144,17 @@ export function InvoicesTable({ rows }: { rows: InvoiceRow[] }) {
               <tr key={`${row.source}-${row.id}`} className="border-b border-brand-border last:border-0">
                 <td data-label="Fecha" className="p-3">{row.date}</td>
                 <td data-label="Detalle" className="p-3">
-                  <p className="font-medium text-brand-ink">{row.title}</p>
+                  {row.href ? (
+                    <Link href={row.href} className="font-medium text-brand-ink hover:underline">
+                      {row.title}
+                    </Link>
+                  ) : (
+                    <p className="font-medium text-brand-ink">{row.title}</p>
+                  )}
                   {row.subtitle && <p className="text-xs text-brand-muted">{row.subtitle}</p>}
                 </td>
                 <td data-label="Origen" className="p-3">
-                  <Badge variant={row.source === "gasto" ? "danger" : "muted"}>
-                    {row.source === "gasto" ? "Gasto" : "Factura"}
-                  </Badge>
+                  <Badge variant={row.source === "gasto" ? "danger" : "muted"}>{SOURCE_LABEL[row.source]}</Badge>
                 </td>
                 <td data-label="Monto" className="p-3">{currency.format(row.amount)}</td>
                 <td data-label="" className="p-3">

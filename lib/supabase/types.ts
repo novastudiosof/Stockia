@@ -42,6 +42,17 @@ export type Organization = {
   invoice_resolution_from: number | null;
   invoice_resolution_to: number | null;
   invoice_resolution_valid_until: string | null;
+  /** Medios de pago activos además del efectivo (migración 024). */
+  payment_methods: OptionalPaymentKey[];
+  /** Nombre del medio "Otro" (ej: Bold, Bono). */
+  payment_other_label: string;
+  /** Plazo del fiado por defecto, en días. */
+  default_credit_days: number;
+  /** Descuento máximo que puede dar un auxiliar (% de la venta). */
+  max_discount_pct: number;
+  /** Migración 027: alertas de stock mínimo. */
+  stock_alerts_enabled: boolean;
+  default_min_stock: number;
   created_at: string;
 };
 
@@ -93,6 +104,8 @@ export type Product = {
   barcode: string | null;
   tax_kind: "iva" | "consumo" | "exento" | "excluido";
   tax_rate: number;
+  /** null = usa el mínimo general del negocio (migración 027). */
+  min_stock: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -105,7 +118,7 @@ export type StockMovement = {
   previous_quantity: number;
   new_quantity: number;
   reason: string | null;
-  source: "initial" | "manual" | "sale" | "void" | "import";
+  source: "initial" | "manual" | "sale" | "void" | "import" | "purchase" | "purchase_void";
   created_by: string | null;
   created_at: string;
 };
@@ -119,6 +132,10 @@ export type Cliente = {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
+  /** Cupo de fiado (null = sin cupo: solo el administrador le fía). */
+  credit_limit: number | null;
+  /** Plazo propio del fiado en días (null = el del negocio). */
+  credit_days: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -153,7 +170,11 @@ export type MovementConcept = {
   created_at: string;
 };
 
-export type PaymentMethod = "efectivo" | "transferencia" | "mixto";
+export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "otro" | "credito" | "mixto";
+/** Medios que cada negocio activa o desactiva (el efectivo siempre está). */
+export type OptionalPaymentKey = "nequi" | "daviplata" | "llave" | "tarjeta" | "otro" | "credito";
+/** Medios con los que se recibe un abono. */
+export type AbonoMethod = "efectivo" | "nequi" | "daviplata" | "llave" | "tarjeta" | "otro";
 export type TransferChannel = "nequi" | "daviplata" | "llave";
 
 export type CashDay = {
@@ -171,6 +192,20 @@ export type CashDay = {
   returns_nequi: number;
   returns_daviplata: number;
   returns_llave: number;
+  sales_tarjeta: number;
+  sales_otro: number;
+  sales_credito: number;
+  returns_tarjeta: number;
+  returns_otro: number;
+  returns_credito: number;
+  abonos_cash: number;
+  abonos_nequi: number;
+  abonos_daviplata: number;
+  abonos_llave: number;
+  abonos_tarjeta: number;
+  abonos_otro: number;
+  purchases_cash: number;
+  supplier_payments_cash: number;
   manual_sales: number;
   expenses: number;
   expected_cash: number;
@@ -193,6 +228,12 @@ export type SaleItem = {
   tax?: number;
   /** Precio de compra al vender (lo agrega un trigger; ventas viejas: estimado). */
   unitCost?: number;
+  /** Solo si la línea tuvo descuento: valor antes de descuentos. */
+  grossSubtotal?: number;
+  /** Descuento propio de la línea. */
+  lineDiscount?: number;
+  /** Descuento total de la línea (propio + su parte del de la venta). */
+  discount?: number;
 };
 
 export type ProfitSummary = {
@@ -226,6 +267,10 @@ export type Sale = {
   items: SaleItem[];
   total: number;
   tax_total: number;
+  /** Todos los descuentos de la venta. */
+  discount_total?: number;
+  /** Descuento a toda la venta (aparte de los de cada producto). */
+  global_discount?: number;
   created_by: string | null;
   created_at: string;
   voided_at: string | null;
@@ -240,6 +285,15 @@ export type Sale = {
   pay_nequi: number;
   pay_daviplata: number;
   pay_llave: number;
+  pay_tarjeta: number;
+  pay_otro: number;
+  /** Nombre del medio "Otro" al momento de la venta. */
+  pay_otro_label: string | null;
+  /** Valor fiado. */
+  pay_credito: number;
+  /** Lo que falta por pagar del fiado. */
+  credit_balance: number;
+  credit_due_date: string | null;
   sold_by_name: string | null;
   customer_email: string | null;
   email_sent_at: string | null;
@@ -282,6 +336,8 @@ export type ActivityLogEntry = {
 type NewSaleItemInput = {
   productId: string;
   quantity: number;
+  discountType?: "pct" | "amount";
+  discountValue?: number;
 };
 
 type NewCustomerData = {
@@ -307,6 +363,145 @@ export type CashDaySummary = {
   returns_nequi: number;
   returns_daviplata: number;
   returns_llave: number;
+  sales_tarjeta: number;
+  sales_otro: number;
+  sales_credito: number;
+  returns_tarjeta: number;
+  returns_otro: number;
+  returns_credito: number;
+  abonos_count: number;
+  abonos_total: number;
+  abonos_cash: number;
+  abonos_nequi: number;
+  abonos_daviplata: number;
+  abonos_llave: number;
+  abonos_tarjeta: number;
+  abonos_otro: number;
+  /** Compras de contado pagadas desde la caja. */
+  purchases_cash: number;
+  /** Abonos a proveedores pagados desde la caja. */
+  supplier_payments_cash: number;
+};
+
+export type Supplier = {
+  id: string;
+  organization_id: string;
+  nombre: string;
+  nit: string | null;
+  telefono: string | null;
+  email: string | null;
+  direccion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PurchaseItem = {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitCost: number;
+  subtotal: number;
+  previousCost: number;
+  newCost: number;
+  previousSalePrice: number;
+  salePrice: number;
+};
+
+export type Purchase = {
+  id: string;
+  organization_id: string;
+  purchase_number: number;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  invoice_number: string | null;
+  purchase_date: string;
+  items: PurchaseItem[];
+  total: number;
+  payment_type: "contado" | "credito";
+  pay_source: "caja" | "externo" | null;
+  balance: number;
+  due_date: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+  /** Foto/PDF de la factura del proveedor (migración 027). */
+  file_path: string | null;
+};
+
+export type SupplierPayment = {
+  id: string;
+  organization_id: string;
+  purchase_id: string;
+  supplier_id: string | null;
+  amount: number;
+  source: "caja" | "externo";
+  notes: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+};
+
+export type CustomerPayment = {
+  id: string;
+  organization_id: string;
+  customer_id: string | null;
+  customer_name: string;
+  amount: number;
+  method: AbonoMethod;
+  method_label: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+};
+
+export type CustomerPaymentAllocation = {
+  payment_id: string;
+  sale_id: string;
+  organization_id: string;
+  amount: number;
+};
+
+export type LowStockRow = {
+  product_id: string;
+  name: string;
+  barcode: string | null;
+  category_id: string;
+  category_name: string;
+  category_icon: string;
+  quantity: number;
+  min_stock: number;
+  own_min: boolean;
+  last_supplier_id: string | null;
+  last_supplier_name: string | null;
+  last_unit_cost: number | null;
+  last_purchase_date: string | null;
+};
+
+export type CarteraRow = {
+  customer_id: string;
+  nombre: string;
+  documento: string | null;
+  telefono: string | null;
+  credit_limit: number | null;
+  sales_count: number;
+  debt: number;
+  current_amount: number;
+  overdue_1_30: number;
+  overdue_31_60: number;
+  overdue_61_90: number;
+  overdue_90: number;
+  oldest_due: string | null;
 };
 
 export type DailySales = { day: string; sales_count: number; total: number };
@@ -314,12 +509,18 @@ export type DailySales = { day: string; sales_count: number; total: number };
 export type PaymentInput =
   | { method: "efectivo" }
   | { method: "transferencia"; channel: TransferChannel }
+  | { method: "tarjeta" }
+  | { method: "otro" }
+  | { method: "credito" }
   | {
       method: "mixto";
       efectivo: number;
       nequi: number;
       daviplata: number;
       llave: number;
+      tarjeta: number;
+      otro: number;
+      credito: number;
     };
 
 type BulkImportItem = {
@@ -422,6 +623,37 @@ export type Database = {
         Update: Partial<SaleDraft>;
         Relationships: [];
       };
+      suppliers: {
+        Row: Supplier;
+        Insert: Partial<Supplier> & Pick<Supplier, "organization_id" | "nombre">;
+        Update: Partial<Supplier>;
+        Relationships: [];
+      };
+      purchases: {
+        Row: Purchase;
+        Insert: Partial<Purchase> & Pick<Purchase, "organization_id">;
+        Update: Partial<Purchase>;
+        Relationships: [];
+      };
+      supplier_payments: {
+        Row: SupplierPayment;
+        Insert: Partial<SupplierPayment> & Pick<SupplierPayment, "organization_id" | "purchase_id" | "amount" | "source">;
+        Update: Partial<SupplierPayment>;
+        Relationships: [];
+      };
+      customer_payments: {
+        Row: CustomerPayment;
+        Insert: Partial<CustomerPayment> &
+          Pick<CustomerPayment, "organization_id" | "customer_name" | "amount" | "method">;
+        Update: Partial<CustomerPayment>;
+        Relationships: [];
+      };
+      customer_payment_allocations: {
+        Row: CustomerPaymentAllocation;
+        Insert: CustomerPaymentAllocation;
+        Update: Partial<CustomerPaymentAllocation>;
+        Relationships: [];
+      };
       stock_movements: {
         Row: StockMovement;
         Insert: Partial<StockMovement> &
@@ -453,6 +685,7 @@ export type Database = {
           p_customer_data?: NewCustomerData | null;
           p_payment?: PaymentInput | null;
           p_customer_email?: string | null;
+          p_discount?: { type: "pct" | "amount"; value: number } | null;
         };
         Returns: { sale_id: string; total: number; sale_number: number }[];
       };
@@ -523,6 +756,59 @@ export type Database = {
         Args: { p_from: string; p_to: string; p_group?: "day" | "month" };
         Returns: ProfitByPeriod[];
       };
+      create_purchase: {
+        Args: {
+          p_supplier_id: string | null;
+          p_invoice_number: string | null;
+          p_purchase_date: string;
+          p_items: { productId: string; quantity: number; unitCost: number; salePrice?: number }[];
+          p_payment: { type: "contado"; source: "caja" | "externo" } | { type: "credito"; days: number };
+          p_notes?: string | null;
+        };
+        Returns: { purchase_id: string; purchase_number: number; total: number }[];
+      };
+      void_purchase: {
+        Args: { p_purchase_id: string; p_reason?: string | null };
+        Returns: undefined;
+      };
+      register_supplier_payment: {
+        Args: { p_purchase_id: string; p_amount: number; p_source: "caja" | "externo"; p_notes?: string | null };
+        Returns: string;
+      };
+      void_supplier_payment: {
+        Args: { p_payment_id: string };
+        Returns: undefined;
+      };
+      register_customer_payment: {
+        Args: {
+          p_customer_id: string;
+          p_amount: number;
+          p_method: AbonoMethod;
+          p_sale_id?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: string;
+      };
+      void_customer_payment: {
+        Args: { p_payment_id: string; p_reason?: string | null };
+        Returns: undefined;
+      };
+      low_stock_products: {
+        Args: Record<string, never>;
+        Returns: LowStockRow[];
+      };
+      low_stock_count: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      set_purchase_file: {
+        Args: { p_purchase_id: string; p_file_path: string | null };
+        Returns: string | null;
+      };
+      cartera_resumen: {
+        Args: Record<string, never>;
+        Returns: CarteraRow[];
+      };
       bulk_import_products: {
         Args: {
           p_organization_id: string;
@@ -536,17 +822,30 @@ export type Database = {
   };
 };
 
+export type DraftDiscount = { type: "pct" | "amount"; value: string };
+
 export type SaleDraftState = {
-  lines: { productId: string; quantity: number }[];
+  lines: { productId: string; quantity: number; discount?: DraftDiscount | null }[];
+  /** Descuento a toda la venta. */
+  globalDiscount?: DraftDiscount | null;
   customerMode: "none" | "existing" | "new";
   selectedCustomer: Cliente | null;
   newCustomer: { nombre: string; documento: string; telefono: string; direccion: string };
   customerEmail: string;
   whatsapp: string;
   cashReceived: string;
-  payMethod: "efectivo" | "transferencia" | "mixto";
+  payMethod: PaymentMethod;
   channel: TransferChannel;
-  mixed: { efectivo: string; nequi: string; daviplata: string; llave: string };
+  /** Ventas en espera viejas no traen tarjeta, otro ni credito. */
+  mixed: {
+    efectivo: string;
+    nequi: string;
+    daviplata: string;
+    llave: string;
+    tarjeta?: string;
+    otro?: string;
+    credito?: string;
+  };
 };
 
 export type SaleDraft = {

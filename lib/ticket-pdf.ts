@@ -9,6 +9,8 @@ export interface TicketItem {
   quantity: number;
   unitPrice: string;
   subtotal: string;
+  /** Descuento propio de la línea, ya formateado (solo si tuvo). */
+  discount?: string;
 }
 
 export interface TicketData {
@@ -27,6 +29,8 @@ export interface TicketData {
   /** Solo si la venta tiene impuestos: subtotal sin impuestos y una línea por impuesto. */
   subtotal?: string;
   taxLines?: { label: string; amount: string }[];
+  /** Descuento a toda la venta, ya formateado (solo si tuvo). */
+  globalDiscount?: string;
   total: string;
   paymentText: string | null;
   footer: string | null;
@@ -132,9 +136,13 @@ export function buildTicketPdf(data: TicketData, widthMm: 58 | 80): Blob {
   for (const item of data.items) {
     addWrapped(item.name);
     leftRight(`${item.quantity} x ${item.unitPrice}`, item.subtotal, cols).forEach((l) => add(l));
+    if (item.discount) leftRight("  Descuento", `-${item.discount}`, cols).forEach((l) => add(l));
   }
 
   add(rule);
+  if (data.globalDiscount) {
+    leftRight("Descuento a la venta", `-${data.globalDiscount}`, cols).forEach((l) => add(l));
+  }
   if (data.subtotal && data.taxLines && data.taxLines.length > 0) {
     leftRight("Subtotal", data.subtotal, cols).forEach((l) => add(l));
     for (const tax of data.taxLines) {

@@ -59,6 +59,11 @@ export function ThermalInvoice({
 
   const taxRows = summarizeTaxes(items);
   const taxSum = taxRows.reduce((sum, row) => sum + row.tax, 0);
+  // Descuento a toda la venta: lo repartido entre las líneas fuera de su descuento propio.
+  const globalDiscount = items.reduce(
+    (sum, item) => sum + Number(item.discount ?? 0) - Number(item.lineDiscount ?? 0),
+    0
+  );
 
   return (
     <div>
@@ -160,14 +165,29 @@ export function ThermalInvoice({
                 <span>
                   {item.quantity} x{" "}
                   {money(
-                    item.taxRate && item.taxRate > 0 ? item.subtotal / item.quantity : item.unitPrice
+                    item.taxRate && item.taxRate > 0
+                      ? (item.grossSubtotal ?? item.subtotal) / item.quantity
+                      : item.unitPrice
                   )}
                 </span>
-                <span>{money(item.subtotal)}</span>
+                <span>{money(item.grossSubtotal ?? item.subtotal)}</span>
               </div>
+              {Number(item.lineDiscount ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span>  Descuento</span>
+                  <span>-{money(Number(item.lineDiscount))}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
+
+        {globalDiscount > 0 && (
+          <div className="flex justify-between border-t border-dashed border-brand-muted pt-2">
+            <span>Descuento a la venta</span>
+            <span>-{money(globalDiscount)}</span>
+          </div>
+        )}
 
         {taxSum > 0 && (
           <div className="flex flex-col border-t border-dashed border-brand-muted pt-2">

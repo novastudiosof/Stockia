@@ -13,6 +13,7 @@ import {
   changePasswordSchema,
   createAuxiliarSchema,
   invoiceSettingsSchema,
+  paymentSettingsSchema,
   themeColorSchema,
 } from "@/lib/validations/cuenta";
 
@@ -259,4 +260,42 @@ export async function updateMyThemeColor(themeColor: string | null): Promise<{ e
   await logActivity(profile, "Cambió el color de la página", parsed.data ?? "color por defecto");
   revalidatePath("/dashboard", "layout");
   return {};
+}
+
+/** Medios de pago activos, nombre del medio "Otro" y plazo del fiado (solo el administrador). */
+export async function updateMyPaymentSettings(input: {
+  methods: string[];
+  otherLabel: string;
+  defaultCreditDays: string | number;
+  maxDiscountPct: string | number;
+}): Promise<{ error?: string; success?: string }> {
+  const profile = await requireRole("owner");
+  if (!profile.organization_id) return { error: "Sin organización asociada" };
+
+  const parsed = paymentSettingsSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      payment_methods: Array.from(new Set(parsed.data.methods)),
+      payment_other_label: parsed.data.otherLabel,
+      default_credit_days: parsed.data.defaultCreditDays,
+      max_discount_pct: parsed.data.maxDiscountPct,
+    })
+    .eq("id", profile.organization_id);
+  if (error) {
+    return {
+      error: friendlyDbError(error, "updateMyPaymentSettings", "No se pudieron guardar los medios de pago", {
+        PGRST204: "Falta ejecutar las migraciones 024 y 025 en Supabase",
+        "42703": "Falta ejecutar las migraciones 024 y 025 en Supabase",
+      }),
+    };
+  }
+
+  await logActivity(profile, "Actualizó medios de pago", parsed.data.methods.join(", ") || "solo efectivo");
+  revalidatePath("/dashboard/cuenta");
+  revalidatePath("/dashboard", "layout");
+  return { success: "Medios de pago y descuentos guardados" };
 }

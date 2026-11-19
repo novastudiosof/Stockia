@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 
@@ -14,15 +15,30 @@ import type { Cliente } from "@/lib/supabase/types";
 interface ClientesTableProps {
   clientes: Cliente[];
   canEdit: boolean;
+  /** Saldo pendiente de fiado por cliente (id -> valor). */
+  debts?: Record<string, number>;
+  defaultCreditDays?: number;
 }
 
-export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
+const currency = new Intl.NumberFormat("es-CO", {
+  style: "currency",
+  currency: "COP",
+  maximumFractionDigits: 0,
+});
+
+export function ClientesTable({
+  clientes,
+  canEdit,
+  debts = {},
+  defaultCreditDays = 30,
+}: ClientesTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [addOpen, setAddOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Cliente | null>(null);
   const [deleting, setDeleting] = React.useState<Cliente | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const term = search.toLowerCase();
   const filtered = clientes.filter(
@@ -37,9 +53,11 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
   async function handleDelete() {
     if (!deleting) return;
     setIsDeleting(true);
-    await deleteCliente(deleting.id, deleting.nombre);
+    setDeleteError(null);
+    const result = await deleteCliente(deleting.id, deleting.nombre);
     setIsDeleting(false);
     setDeleting(null);
+    if (result?.error) setDeleteError(result.error);
     router.refresh();
   }
 
@@ -63,6 +81,8 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
         )}
       </div>
 
+      {deleteError && <p className="text-sm text-brand-danger">{deleteError}</p>}
+
       <div className="overflow-x-auto rounded-[var(--radius-brand-md)] border border-brand-border bg-white">
         <table className="table-stack w-full min-w-[720px] text-sm">
           <thead>
@@ -72,13 +92,14 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
               <th className="p-3 font-medium">Teléfono</th>
               <th className="p-3 font-medium">Correo</th>
               <th className="p-3 font-medium">Dirección</th>
+              <th className="p-3 font-medium">Debe</th>
               {canEdit && <th className="p-3 font-medium text-right">Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={canEdit ? 6 : 5} className="p-6 text-center text-brand-muted">
+                <td colSpan={canEdit ? 7 : 6} className="p-6 text-center text-brand-muted">
                   {clientes.length === 0
                     ? "Aún no tienes clientes. Se guardan automáticamente al vender, o agrégalos aquí."
                     : "No hay clientes que coincidan."}
@@ -92,6 +113,23 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
                 <td data-label="Teléfono" className="p-3 text-brand-muted">{cliente.telefono || "—"}</td>
                 <td data-label="Correo" className="p-3 text-brand-muted">{cliente.email || "—"}</td>
                 <td data-label="Dirección" className="p-3 text-brand-muted">{cliente.direccion || "—"}</td>
+                <td data-label="Debe" className="p-3">
+                  {debts[cliente.id] ? (
+                    <Link
+                      href={`/dashboard/cartera/${cliente.id}`}
+                      className="font-medium text-brand-danger underline-offset-2 hover:underline"
+                    >
+                      {currency.format(debts[cliente.id])}
+                    </Link>
+                  ) : (
+                    <span className="text-brand-muted">—</span>
+                  )}
+                  {cliente.credit_limit != null && (
+                    <span className="block text-xs text-brand-muted">
+                      Cupo {currency.format(cliente.credit_limit)}
+                    </span>
+                  )}
+                </td>
                 {canEdit && (
                   <td data-label="" className="p-3">
                     <div className="flex justify-end gap-1">
@@ -112,7 +150,13 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
 
       {canEdit && (
         <>
-          <ClienteFormDialog open={addOpen} onOpenChange={setAddOpen} action={createCliente} />
+          <ClienteFormDialog
+            open={addOpen}
+            onOpenChange={setAddOpen}
+            action={createCliente}
+            canEditCredit
+            defaultCreditDays={defaultCreditDays}
+          />
 
           {editing && boundUpdate && (
             <ClienteFormDialog
@@ -120,6 +164,8 @@ export function ClientesTable({ clientes, canEdit }: ClientesTableProps) {
               onOpenChange={(open) => !open && setEditing(null)}
               cliente={editing}
               action={boundUpdate}
+              canEditCredit
+              defaultCreditDays={defaultCreditDays}
             />
           )}
 

@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { requireProfile } from "@/lib/auth";
 import { getTaxSettings } from "@/lib/org-tax";
+import { getStockSettings } from "@/lib/org-stock";
 import { createClient } from "@/lib/supabase/server";
 import { ProductsTable } from "@/components/catalogo/products-table";
 import { ImportProductsButton } from "@/components/catalogo/import-products-button";
@@ -28,13 +29,18 @@ export default async function CategoryDetailPage({
 
   if (!category) notFound();
 
-  const taxSettings = await getTaxSettings(profile.organization_id);
-
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("category_id", categoryId)
-    .order("name", { ascending: true });
+  const isOwner = profile.role === "owner";
+  const [taxSettings, stockSettings, { data: rows }] = await Promise.all([
+    getTaxSettings(profile.organization_id),
+    getStockSettings(profile.organization_id),
+    supabase
+      .from("products")
+      .select("*")
+      .eq("category_id", categoryId)
+      .order("name", { ascending: true }),
+  ]);
+  // El costo no viaja al navegador del auxiliar.
+  const products = ((rows as Product[] | null) ?? []).map((p) => (isOwner ? p : { ...p, purchase_price: 0 }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,9 +68,10 @@ export default async function CategoryDetailPage({
 
       <ProductsTable
         categoryId={categoryId}
-        products={(products as Product[]) ?? []}
-        canEdit={profile.role === "owner"}
+        products={products}
+        canEdit={isOwner}
         taxSettings={taxSettings}
+        stockSettings={stockSettings}
       />
     </div>
   );

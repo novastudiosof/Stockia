@@ -5,11 +5,11 @@ import { headers } from "next/headers";
 
 import { requireProfile } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
-import { requireModule, MODULE_KEYS } from "@/lib/modules";
+import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { friendlyDbError } from "@/lib/db-errors";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
-import { saleInputSchema } from "@/lib/validations/ventas-productos";
+import { saleInputSchema, usesCredit } from "@/lib/validations/ventas-productos";
 import type { Organization, PaymentInput, Sale } from "@/lib/supabase/types";
 
 type ActionResult = {
@@ -28,10 +28,17 @@ export interface NewCustomerInput {
 }
 
 export async function createSale(
-  items: { productId: string; quantity: number }[],
+  items: {
+    productId: string;
+    quantity: number;
+    discountType?: "pct" | "amount";
+    discountValue?: number;
+  }[],
   customer?: { id?: string; data?: NewCustomerInput },
   payment?: PaymentInput,
-  customerEmail?: string
+  customerEmail?: string,
+  /** Descuento a toda la venta. */
+  discount?: { type: "pct" | "amount"; value: number }
 ): Promise<ActionResult> {
   const profile = await requireProfile();
   if (!profile.organization_id) return { error: "Sin organización asociada" };
@@ -43,8 +50,17 @@ export async function createSale(
     customerEmail,
     customerId: customer?.id,
     customerData: customer?.data,
+    discount: discount && discount.value > 0 ? discount : undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  // El fiado queda a nombre de un cliente: exige el módulo Clientes.
+  if (
+    usesCredit(parsed.data.payment) &&
+    !(await isModuleEnabled(profile.organization_id, MODULE_KEYS.CLIENTES))
+  ) {
+    return { error: "Para fiar se necesita el módulo Clientes" };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -55,14 +71,22 @@ export async function createSale(
       p_customer_data: parsed.data.customerData ?? null,
       p_payment: parsed.data.payment,
       p_customer_email: parsed.data.customerEmail || null,
+      p_discount: parsed.data.discount ?? null,
     })
     .single<{ sale_id: string; total: number; sale_number: number }>();
 
-  if (error) return { error: friendlyDbError(error, "createSale", "No se pudo registrar la venta") };
+  if (error) {
+    return {
+      error: friendlyDbError(error, "createSale", "No se pudo registrar la venta", {
+        PGRST202: "Falta ejecutar la migración 025 en Supabase",
+      }),
+    };
+  }
 
   await logActivity(profile, "Registró venta de productos", `Total: ${data.total}`);
   revalidatePath("/dashboard/ventas-productos");
   revalidatePath("/dashboard/catalogo");
+  revalidatePath("/dashboard/cartera", "layout");
 
   return { saleId: data.sale_id, total: data.total, saleNumber: data.sale_number };
 }
@@ -106,6 +130,7 @@ export async function voidSale(
   );
   revalidatePath("/dashboard/ventas-productos");
   revalidatePath("/dashboard/catalogo");
+  revalidatePath("/dashboard/cartera", "layout");
   revalidatePath("/dashboard/ventas");
   return {};
 }

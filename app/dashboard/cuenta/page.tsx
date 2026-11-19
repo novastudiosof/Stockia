@@ -5,6 +5,10 @@ import { AuxiliarManager } from "@/components/cuenta/auxiliar-manager";
 import { ConceptsManager } from "@/components/cuenta/concepts-manager";
 import { InvoiceSettings } from "@/components/cuenta/invoice-settings";
 import { ThemeColorForm } from "@/components/cuenta/theme-color-form";
+import { PaymentSettingsForm } from "@/components/cuenta/payment-settings";
+import { StockAlertSettingsForm } from "@/components/cuenta/stock-alert-settings";
+import { DEFAULT_STOCK_SETTINGS } from "@/lib/stock";
+import { paymentSettingsOf } from "@/lib/payments";
 import { isModuleEnabled, MODULE_KEYS } from "@/lib/modules";
 import type { MovementConcept, Organization, Profile } from "@/lib/supabase/types";
 
@@ -16,6 +20,7 @@ export default async function CuentaPage() {
   let concepts: MovementConcept[] = [];
   let showConcepts = false;
   let organization: Organization | null = null;
+  let clientesEnabled = false;
 
   if (profile.role === "owner" && profile.organization_id) {
     const supabase = await createClient();
@@ -41,6 +46,7 @@ export default async function CuentaPage() {
       concepts = (conceptRows as MovementConcept[]) ?? [];
       showConcepts = true;
     }
+    clientesEnabled = await isModuleEnabled(profile.organization_id, MODULE_KEYS.CLIENTES);
     auxiliares = (aux as Profile[]) ?? [];
     organization = (org as Organization) ?? null;
     maxAuxiliares = organization?.max_auxiliares ?? 0;
@@ -60,6 +66,16 @@ export default async function CuentaPage() {
       {profile.role === "owner" && organization && (
         <>
           <ThemeColorForm savedColor={organization.theme_color} />
+          <PaymentSettingsForm
+            settings={paymentSettingsOf(organization)}
+            clientesEnabled={clientesEnabled}
+          />
+          <StockAlertSettingsForm
+            settings={{
+              alertsEnabled: organization.stock_alerts_enabled ?? DEFAULT_STOCK_SETTINGS.alertsEnabled,
+              defaultMinStock: organization.default_min_stock ?? DEFAULT_STOCK_SETTINGS.defaultMinStock,
+            }}
+          />
           <InvoiceSettings organization={organization} />
         </>
       )}

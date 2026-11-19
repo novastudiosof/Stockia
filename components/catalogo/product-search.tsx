@@ -74,7 +74,7 @@ export function ProductSearch() {
               <div className="shrink-0 text-right">
                 <p className="font-medium text-brand-ink">{currency.format(product.sale_price)}</p>
                 <p
-                  className={`text-xs ${product.quantity <= 10 ? "text-brand-danger" : "text-brand-muted"}`}
+                  className={`text-xs ${product.low ? "text-brand-danger" : "text-brand-muted"}`}
                 >
                   Stock: {product.quantity}
                 </p>

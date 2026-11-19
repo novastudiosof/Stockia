@@ -26,6 +26,8 @@ interface CashClosingProps {
   cashDay: CashDay | null;
   live: CashDaySummary;
   salesEnabled: boolean;
+  /** Nombre del medio de pago "Otro" del negocio. */
+  otherLabel?: string;
 }
 
 function Line({
@@ -50,23 +52,45 @@ function Line({
   );
 }
 
-export function CashClosing({ day, today, cashDay, live, salesEnabled }: CashClosingProps) {
+export function CashClosing({
+  day,
+  today,
+  cashDay,
+  live,
+  salesEnabled,
+  otherLabel = "Otro",
+}: CashClosingProps) {
   const router = useRouter();
   const closed = !!cashDay?.closed_at;
 
   // Un día cerrado muestra la foto guardada al cerrar; uno abierto, las cifras en vivo.
+  const n = (value: number | null | undefined) => Number(value ?? 0);
   const figures = closed && cashDay
     ? {
-        sales_cash: Number(cashDay.sales_cash),
-        sales_nequi: Number(cashDay.sales_nequi),
-        sales_daviplata: Number(cashDay.sales_daviplata),
-        sales_llave: Number(cashDay.sales_llave),
-        manual_sales: Number(cashDay.manual_sales),
-        expenses: Number(cashDay.expenses),
-        returns_cash: Number(cashDay.returns_cash ?? 0),
-        returns_nequi: Number(cashDay.returns_nequi ?? 0),
-        returns_daviplata: Number(cashDay.returns_daviplata ?? 0),
-        returns_llave: Number(cashDay.returns_llave ?? 0),
+        sales_cash: n(cashDay.sales_cash),
+        sales_nequi: n(cashDay.sales_nequi),
+        sales_daviplata: n(cashDay.sales_daviplata),
+        sales_llave: n(cashDay.sales_llave),
+        sales_tarjeta: n(cashDay.sales_tarjeta),
+        sales_otro: n(cashDay.sales_otro),
+        sales_credito: n(cashDay.sales_credito),
+        manual_sales: n(cashDay.manual_sales),
+        expenses: n(cashDay.expenses),
+        returns_cash: n(cashDay.returns_cash),
+        returns_nequi: n(cashDay.returns_nequi),
+        returns_daviplata: n(cashDay.returns_daviplata),
+        returns_llave: n(cashDay.returns_llave),
+        returns_tarjeta: n(cashDay.returns_tarjeta),
+        returns_otro: n(cashDay.returns_otro),
+        returns_credito: n(cashDay.returns_credito),
+        abonos_cash: n(cashDay.abonos_cash),
+        abonos_nequi: n(cashDay.abonos_nequi),
+        abonos_daviplata: n(cashDay.abonos_daviplata),
+        abonos_llave: n(cashDay.abonos_llave),
+        abonos_tarjeta: n(cashDay.abonos_tarjeta),
+        abonos_otro: n(cashDay.abonos_otro),
+        purchases_cash: n(cashDay.purchases_cash),
+        supplier_payments_cash: n(cashDay.supplier_payments_cash),
       }
     : live;
 
@@ -88,17 +112,37 @@ export function CashClosing({ day, today, cashDay, live, salesEnabled }: CashClo
   const baseNumber = Number(base) || 0;
   const expected = closed && cashDay
     ? Number(cashDay.expected_cash)
-    : baseNumber + figures.sales_cash - figures.returns_cash + figures.manual_sales - figures.expenses;
+    : baseNumber +
+      figures.sales_cash -
+      figures.returns_cash +
+      figures.abonos_cash +
+      figures.manual_sales -
+      figures.expenses -
+      figures.purchases_cash -
+      figures.supplier_payments_cash;
   const countedNumber = counted === "" ? null : Number(counted);
   const difference = closed && cashDay
     ? Number(cashDay.difference ?? 0)
     : countedNumber === null
       ? null
       : countedNumber - expected;
-  const transfers = figures.sales_nequi + figures.sales_daviplata + figures.sales_llave;
-  const transferReturns =
-    figures.returns_nequi + figures.returns_daviplata + figures.returns_llave;
-  const hasReturns = figures.returns_cash + transferReturns > 0;
+  // Lo que no pasa por el efectivo, por medio de pago (solo los que tienen valor).
+  const nonCash = (pick: (m: "nequi" | "daviplata" | "llave" | "tarjeta" | "otro") => number) =>
+    (
+      [
+        ["Nequi", pick("nequi")],
+        ["Daviplata", pick("daviplata")],
+        ["Llave", pick("llave")],
+        ["Tarjeta", pick("tarjeta")],
+        [otherLabel, pick("otro")],
+      ] as const
+    ).filter(([, amount]) => amount > 0);
+  const salesOther = nonCash((m) => figures[`sales_${m}`]);
+  const returnsOther = nonCash((m) => figures[`returns_${m}`]);
+  const abonosOther = nonCash((m) => figures[`abonos_${m}`]);
+  const sum = (rows: readonly (readonly [string, number])[]) => rows.reduce((t, [, a]) => t + a, 0);
+  const detail = (rows: readonly (readonly [string, number])[]) =>
+    rows.map(([label, amount]) => `${label} ${currency.format(amount)}`).join(" · ");
 
   async function run(action: () => Promise<{ error?: string; success?: string }>) {
     setBusy(true);
@@ -185,26 +229,52 @@ export function CashClosing({ day, today, cashDay, live, salesEnabled }: CashClo
             {salesEnabled && figures.returns_cash > 0 && (
               <Line label="Devoluciones en efectivo de hoy" value={figures.returns_cash} sign="-" />
             )}
+            {figures.abonos_cash > 0 && (
+              <Line label="Abonos de fiado en efectivo" value={figures.abonos_cash} sign="+" />
+            )}
             <Line label="Ventas manuales (se cuentan como efectivo)" value={figures.manual_sales} sign="+" />
             <Line label="Gastos (se cuentan como efectivo)" value={figures.expenses} sign="-" />
-            <Line label="Efectivo esperado en caja" value={expected} strong />
-            {salesEnabled && hasReturns && transferReturns > 0 && (
-              <p className="pt-3 text-xs text-brand-muted">
-                Devoluciones por transferencia (no salen del efectivo): {currency.format(transferReturns)}
-                {" "}(Nequi {currency.format(figures.returns_nequi)} · Daviplata{" "}
-                {currency.format(figures.returns_daviplata)} · Llave {currency.format(figures.returns_llave)})
-              </p>
+            {figures.purchases_cash > 0 && (
+              <Line label="Compras pagadas desde la caja" value={figures.purchases_cash} sign="-" />
             )}
+            {figures.supplier_payments_cash > 0 && (
+              <Line label="Pagos a proveedores desde la caja" value={figures.supplier_payments_cash} sign="-" />
+            )}
+            <Line label="Efectivo esperado en caja" value={expected} strong />
             {salesEnabled && (
-              <div className="pt-3 text-xs text-brand-muted">
-                <p className="mb-1 font-medium text-brand-ink">
-                  Cobrado por transferencia (no entra al efectivo): {currency.format(transfers)}
-                </p>
-                <p>
-                  Nequi {currency.format(figures.sales_nequi)} · Daviplata{" "}
-                  {currency.format(figures.sales_daviplata)} · Llave{" "}
-                  {currency.format(figures.sales_llave)}
-                </p>
+              <div className="flex flex-col gap-2 pt-3 text-xs text-brand-muted">
+                <div>
+                  <p className="font-medium text-brand-ink">
+                    Cobrado por otros medios (no entra al efectivo): {currency.format(sum(salesOther))}
+                  </p>
+                  {salesOther.length > 0 && <p>{detail(salesOther)}</p>}
+                </div>
+                {figures.sales_credito > 0 && (
+                  <p>
+                    <span className="font-medium text-brand-ink">Vendido fiado hoy:</span>{" "}
+                    {currency.format(figures.sales_credito)} (no entra a la caja hasta que lo paguen)
+                  </p>
+                )}
+                {abonosOther.length > 0 && (
+                  <p>
+                    <span className="font-medium text-brand-ink">Abonos por otros medios:</span>{" "}
+                    {detail(abonosOther)}
+                  </p>
+                )}
+                {returnsOther.length > 0 && (
+                  <p>
+                    <span className="font-medium text-brand-ink">
+                      Devoluciones por otros medios (no salen del efectivo):
+                    </span>{" "}
+                    {detail(returnsOther)}
+                  </p>
+                )}
+                {figures.returns_credito > 0 && (
+                  <p>
+                    <span className="font-medium text-brand-ink">Fiado cancelado por devoluciones:</span>{" "}
+                    {currency.format(figures.returns_credito)}
+                  </p>
+                )}
               </div>
             )}
           </CardContent>

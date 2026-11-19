@@ -13,8 +13,7 @@ import { finalUnitPrice, taxLabel, type TaxSettings } from "@/lib/tax";
 import { StockAdjustDialog } from "@/components/catalogo/stock-adjust-dialog";
 import { createProduct, updateProduct, deleteProduct } from "@/lib/actions/catalogo";
 import type { Product } from "@/lib/supabase/types";
-
-const LOW_STOCK_THRESHOLD = 10;
+import { effectiveMinStock, stockStatus, type StockSettings } from "@/lib/stock";
 
 const currency = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -27,9 +26,10 @@ interface ProductsTableProps {
   products: Product[];
   canEdit: boolean;
   taxSettings: TaxSettings;
+  stockSettings: StockSettings;
 }
 
-export function ProductsTable({ categoryId, products, canEdit, taxSettings }: ProductsTableProps) {
+export function ProductsTable({ categoryId, products, canEdit, taxSettings, stockSettings }: ProductsTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [addOpen, setAddOpen] = React.useState(false);
@@ -83,7 +83,8 @@ export function ProductsTable({ categoryId, products, canEdit, taxSettings }: Pr
             <tr className="border-b border-brand-border text-left text-brand-muted">
               <th className="p-3 font-medium">Producto</th>
               <th className="p-3 font-medium">Cantidad</th>
-              <th className="p-3 font-medium">Precio compra</th>
+              {/* El costo es solo del administrador. */}
+              {canEdit && <th className="p-3 font-medium">Precio compra</th>}
               <th className="p-3 font-medium">Precio venta</th>
               <th className="p-3 font-medium">Descripción</th>
               {canEdit && <th className="p-3 font-medium text-right">Acciones</th>}
@@ -92,7 +93,7 @@ export function ProductsTable({ categoryId, products, canEdit, taxSettings }: Pr
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={canEdit ? 6 : 5} className="p-6 text-center text-brand-muted">
+                <td colSpan={canEdit ? 6 : 4} className="p-6 text-center text-brand-muted">
                   No hay productos que coincidan.
                 </td>
               </tr>
@@ -106,14 +107,25 @@ export function ProductsTable({ categoryId, products, canEdit, taxSettings }: Pr
                   )}
                 </td>
                 <td data-label="Cantidad" className="p-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {product.quantity}
-                    {product.quantity <= LOW_STOCK_THRESHOLD && (
-                      <Badge variant="danger">Bajo stock</Badge>
-                    )}
+                    {(() => {
+                      const status = stockStatus(product.quantity, product.min_stock, stockSettings);
+                      if (status === "agotado") return <Badge variant="danger">Agotado</Badge>;
+                      if (status === "bajo") return <Badge variant="danger">Por agotarse</Badge>;
+                      return null;
+                    })()}
                   </div>
+                  {stockSettings.alertsEnabled && (
+                    <p className="text-xs text-brand-muted">
+                      Mín. {effectiveMinStock(product.min_stock, stockSettings)}
+                      {product.min_stock == null ? " (general)" : ""}
+                    </p>
+                  )}
                 </td>
-                <td data-label="Precio compra" className="p-3">{currency.format(product.purchase_price)}</td>
+                {canEdit && (
+                  <td data-label="Precio compra" className="p-3">{currency.format(product.purchase_price)}</td>
+                )}
                 <td data-label="Precio venta" className="p-3">
                   {currency.format(finalUnitPrice(product.sale_price, product.tax_rate, taxSettings))}
                   {taxSettings.taxEnabled && product.tax_rate > 0 && (
@@ -156,6 +168,7 @@ export function ProductsTable({ categoryId, products, canEdit, taxSettings }: Pr
             onOpenChange={setAddOpen}
             action={boundCreate}
             taxSettings={taxSettings}
+            stockSettings={stockSettings}
           />
 
           {editing && boundUpdate && (
@@ -165,6 +178,7 @@ export function ProductsTable({ categoryId, products, canEdit, taxSettings }: Pr
               product={editing}
               action={boundUpdate}
               taxSettings={taxSettings}
+              stockSettings={stockSettings}
             />
           )}
 

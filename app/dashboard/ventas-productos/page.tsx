@@ -1,4 +1,5 @@
-import { requireProfile } from "@/lib/auth";
+import { getCurrentOrganization, requireProfile } from "@/lib/auth";
+import { paymentSettingsOf } from "@/lib/payments";
 import { getTaxSettings } from "@/lib/org-tax";
 import { todayBogota } from "@/lib/dates";
 import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
@@ -17,7 +18,7 @@ export default async function VentasProductosPage() {
 
   const supabase = await createClient();
 
-  const [{ data: products }, { data: categories }, { data: sales }, drafts, { data: team }, taxSettings] = await Promise.all([
+  const [{ data: products }, { data: categories }, { data: sales }, drafts, { data: team }, taxSettings, org] = await Promise.all([
     supabase
       .from("products")
       .select("*")
@@ -44,6 +45,7 @@ export default async function VentasProductosPage() {
       .eq("organization_id", profile.organization_id)
       .order("full_name", { ascending: true }),
     getTaxSettings(profile.organization_id),
+    getCurrentOrganization(profile.organization_id),
   ]);
   const teammates = (team as { id: string; full_name: string }[]) ?? [];
 
@@ -65,6 +67,8 @@ export default async function VentasProductosPage() {
         isAdmin={profile.role === "owner"}
         teammates={teammates}
         taxSettings={taxSettings}
+        paymentSettings={paymentSettingsOf(org)}
+        maxDiscountPct={Number(org?.max_discount_pct ?? 10)}
       />
 
       <div>

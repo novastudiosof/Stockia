@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, FilePlus, Minus, Plus, Search, ShoppingCart, Trash2, User } from "lucide-react";
+import { Clock, FilePlus, Minus, Plus, Search, ShoppingCart, Tag, Trash2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { createSale } from "@/lib/actions/ventas-productos";
 import { DownloadInvoiceButton } from "@/components/ventas-productos/download-invoice-button";
 import { WhatsappInvoiceButton } from "@/components/ventas-productos/whatsapp-invoice-button";
 import { searchClientes } from "@/lib/actions/clientes";
+import { getCustomerCredit, type CustomerCredit } from "@/lib/actions/cartera";
+import type { PaymentSettings } from "@/lib/payments";
 import {
   deleteSaleDraft,
   listSaleDrafts,
@@ -21,7 +23,9 @@ import {
 } from "@/lib/actions/borradores";
 import type {
   Cliente,
+  DraftDiscount,
   PaymentInput,
+  PaymentMethod,
   Product,
   SaleDraft,
   SaleDraftState,
@@ -29,6 +33,7 @@ import type {
 } from "@/lib/supabase/types";
 
 import { computeLineTax, summarizeTaxes, type TaxSettings } from "@/lib/tax";
+import { computeSaleTotals, discountPct, type DiscountInput } from "@/lib/discounts";
 
 const currency = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -39,6 +44,14 @@ const currency = new Intl.NumberFormat("es-CO", {
 interface CartLine {
   product: Product;
   quantity: number;
+  /** Descuento de la línea (el valor se guarda como texto del campo). */
+  discount?: DraftDiscount | null;
+}
+
+/** Descuento escrito en pantalla -> descuento para el cálculo (vacío = ninguno). */
+function toDiscount(d: DraftDiscount | null | undefined): DiscountInput | null {
+  const value = Number(d?.value);
+  return d && value > 0 ? { type: d.type, value } : null;
 }
 
 interface SaleCartProps {
@@ -55,21 +68,23 @@ interface SaleCartProps {
   teammates: { id: string; full_name: string }[];
   /** Impuestos del negocio (apagados por defecto). */
   taxSettings: TaxSettings;
+  /** Medios de pago activos del negocio. */
+  paymentSettings: PaymentSettings;
+  /** Descuento máximo que puede dar un auxiliar (% de la venta). */
+  maxDiscountPct: number;
 }
 
-type PayMethod = "efectivo" | "transferencia" | "mixto";
-
-const PAY_METHOD_LABEL: Record<PayMethod, string> = {
-  efectivo: "Efectivo",
-  transferencia: "Transferencia",
-  mixto: "Mixto",
-};
+type PayMethod = PaymentMethod;
 
 const CHANNEL_LABEL: Record<TransferChannel, string> = {
   nequi: "Nequi",
   daviplata: "Daviplata",
   llave: "Llave",
 };
+
+const CHANNELS: TransferChannel[] = ["nequi", "daviplata", "llave"];
+
+type MixedKey = "efectivo" | "nequi" | "daviplata" | "llave" | "tarjeta" | "otro" | "credito";
 
 type CustomerMode = "none" | "existing" | "new";
 
@@ -80,7 +95,17 @@ const CUSTOMER_MODE_LABEL: Record<CustomerMode, string> = {
 };
 
 const EMPTY_NEW_CUSTOMER = { nombre: "", documento: "", telefono: "", direccion: "" };
-const EMPTY_MIXED = { efectivo: "", nequi: "", daviplata: "", llave: "" };
+const EMPTY_MIXED: Record<MixedKey, string> = {
+  efectivo: "",
+  nequi: "",
+  daviplata: "",
+  llave: "",
+  tarjeta: "",
+  otro: "",
+  credito: "",
+};
+
+const dueFormat = new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "America/Bogota" });
 
 export function SaleCart({
   products,
@@ -91,8 +116,30 @@ export function SaleCart({
   isAdmin,
   teammates,
   taxSettings,
+  paymentSettings,
+  maxDiscountPct,
 }: SaleCartProps) {
   const router = useRouter();
+  const enabled = paymentSettings.methods;
+  const channels = CHANNELS.filter((c) => enabled.includes(c));
+  const creditEnabled = enabled.includes("credito") && clientesEnabled;
+  // Botones de método de pago según lo que el negocio tiene activo.
+  const payMethods: { key: PayMethod; label: string }[] = [
+    { key: "efectivo", label: "Efectivo" },
+    ...(channels.length > 0 ? [{ key: "transferencia" as const, label: "Transferencia" }] : []),
+    ...(enabled.includes("tarjeta") ? [{ key: "tarjeta" as const, label: "Tarjeta" }] : []),
+    ...(enabled.includes("otro") ? [{ key: "otro" as const, label: paymentSettings.otherLabel }] : []),
+    ...(creditEnabled ? [{ key: "credito" as const, label: "Fiado" }] : []),
+  ];
+  if (payMethods.length > 1) payMethods.push({ key: "mixto", label: "Mixto" });
+  // Filas del pago mixto (efectivo siempre).
+  const mixedRows: { key: MixedKey; label: string }[] = [
+    { key: "efectivo", label: "Efectivo" },
+    ...channels.map((c) => ({ key: c as MixedKey, label: CHANNEL_LABEL[c] })),
+    ...(enabled.includes("tarjeta") ? [{ key: "tarjeta" as const, label: "Tarjeta" }] : []),
+    ...(enabled.includes("otro") ? [{ key: "otro" as const, label: paymentSettings.otherLabel }] : []),
+    ...(creditEnabled ? [{ key: "credito" as const, label: "Fiado" }] : []),
+  ];
   const [search, setSearch] = React.useState("");
   // Categoría elegida ("all" = todas). Solo filtra la lista; el carrito no cambia.
   const [categoryId, setCategoryId] = React.useState<string>("all");
@@ -123,8 +170,13 @@ export function SaleCart({
   // Última búsqueda terminada, para saber si el cliente escrito no existe.
   const [searchedQuery, setSearchedQuery] = React.useState<string | null>(null);
   const [payMethod, setPayMethod] = React.useState<PayMethod>("efectivo");
-  const [channel, setChannel] = React.useState<TransferChannel>("nequi");
-  const [mixed, setMixed] = React.useState({ ...EMPTY_MIXED });
+  const [channel, setChannel] = React.useState<TransferChannel>(channels[0] ?? "nequi");
+  const [mixed, setMixed] = React.useState<Record<MixedKey, string>>({ ...EMPTY_MIXED });
+  // Deuda y cupo del cliente elegido, para mostrarlos al fiar.
+  const [credit, setCredit] = React.useState<CustomerCredit | null>(null);
+  // Descuento a toda la venta y qué líneas tienen abierto su campo de descuento.
+  const [globalDiscount, setGlobalDiscount] = React.useState<DraftDiscount | null>(null);
+  const [discountOpen, setDiscountOpen] = React.useState<Record<string, boolean>>({});
 
   // Venta en espera (borrador): se guarda en la base de datos; la ven todos
   // los usuarios del negocio pero solo la edita su responsable.
@@ -148,26 +200,40 @@ export function SaleCart({
 
   const lines = Object.values(cart);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
-  // Mismo cálculo que create_sale() en la base de datos (que es el oficial).
-  const lineTaxes = lines.map((line) =>
-    computeLineTax(line.product.sale_price, line.quantity, line.product.tax_rate, taxSettings)
-  );
-  const total = lineTaxes.reduce((sum, t) => sum + t.total, 0);
-  const taxTotal = lineTaxes.reduce((sum, t) => sum + t.tax, 0);
-  const taxRows = summarizeTaxes(
-    lines.map((line, i) => ({
+  // Mismo cálculo que create_sale() en la base de datos (que es el oficial),
+  // con los descuentos por producto y a toda la venta.
+  const totals = computeSaleTotals(
+    lines.map((line) => ({
+      unitPrice: line.product.sale_price,
+      quantity: line.quantity,
+      taxRate: line.product.tax_rate,
       taxKind: line.product.tax_kind,
-      taxRate: lineTaxes[i].rate,
-      base: lineTaxes[i].base,
-      tax: lineTaxes[i].tax,
-    }))
+      discount: toDiscount(line.discount),
+    })),
+    taxSettings,
+    toDiscount(globalDiscount)
   );
-  const mixedSum =
-    (Number(mixed.efectivo) || 0) +
-    (Number(mixed.nequi) || 0) +
-    (Number(mixed.daviplata) || 0) +
-    (Number(mixed.llave) || 0);
+  const lineTaxes = totals.lines;
+  const total = totals.total;
+  const taxTotal = totals.taxTotal;
+  const taxRows = summarizeTaxes(
+    lineTaxes.map((t) => ({ taxKind: t.taxKind, taxRate: t.rate, base: t.base, tax: t.tax }))
+  );
+  const discountPercent = discountPct(totals);
+  const overDiscountCap = !isAdmin && discountPercent > maxDiscountPct + 0.001;
+  const mixedValue = (key: MixedKey) =>
+    mixedRows.some((row) => row.key === key) ? Number(mixed[key]) || 0 : 0;
+  const mixedSum = mixedRows.reduce((sum, row) => sum + mixedValue(row.key), 0);
   const mixedRemaining = total - mixedSum;
+  // Lo que queda fiado con este pago.
+  const creditAmount =
+    payMethod === "credito" ? total : payMethod === "mixto" ? mixedValue("credito") : 0;
+  const creditDue = (() => {
+    const days = selectedCustomer?.credit_days ?? paymentSettings.defaultCreditDays;
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return dueFormat.format(d);
+  })();
   const cashReceivedNumber = Number(cashReceived) || 0;
   const cashChange = cashReceivedNumber - total;
 
@@ -198,6 +264,21 @@ export function SaleCart({
     }, 300);
     return () => clearTimeout(timeout);
   }, [customerQuery, customerMode, selectedCustomer]);
+
+  // Al fiar a un cliente registrado se consulta cuánto debe y su cupo.
+  const selectedCustomerId = selectedCustomer?.id ?? null;
+  const isCredit = creditAmount > 0;
+  React.useEffect(() => {
+    setCredit(null);
+    if (!selectedCustomerId || !isCredit) return;
+    let cancelled = false;
+    getCustomerCredit(selectedCustomerId).then((result) => {
+      if (!cancelled) setCredit(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCustomerId, isCredit]);
 
   // Si lo escrito no existe, se prepara el alta automática: lo que parece un
   // documento (solo números) va a Documento y el resto a Nombre.
@@ -240,7 +321,15 @@ export function SaleCart({
       const existing = prev[product.id];
       const nextQty = (existing?.quantity ?? 0) + 1;
       if (nextQty > product.quantity) return prev;
-      return { ...prev, [product.id]: { product, quantity: nextQty } };
+      return { ...prev, [product.id]: { ...existing, product, quantity: nextQty } };
+    });
+  }
+
+  function setLineDiscount(productId: string, discount: DraftDiscount | null) {
+    setCart((prev) => {
+      const existing = prev[productId];
+      if (!existing) return prev;
+      return { ...prev, [productId]: { ...existing, discount } };
     });
   }
 
@@ -273,9 +362,17 @@ export function SaleCart({
     for (const line of state.lines) {
       const product = products.find((p) => p.id === line.productId);
       if (!product || product.quantity <= 0) continue;
-      nextCart[product.id] = { product, quantity: Math.min(line.quantity, product.quantity) };
+      nextCart[product.id] = {
+        product,
+        quantity: Math.min(line.quantity, product.quantity),
+        discount: line.discount ?? null,
+      };
     }
     setCart(nextCart);
+    setGlobalDiscount(state.globalDiscount ?? null);
+    setDiscountOpen(
+      Object.fromEntries(state.lines.filter((l) => l.discount).map((l) => [l.productId, true]))
+    );
     setCustomerMode(state.customerMode);
     setSelectedCustomer(state.selectedCustomer);
     setCustomerQuery(state.selectedCustomer?.nombre ?? "");
@@ -285,8 +382,9 @@ export function SaleCart({
     setCustomerEmail(state.customerEmail);
     setWhatsapp(state.whatsapp);
     setCashReceived(state.cashReceived);
-    setPayMethod(state.payMethod);
-    setChannel(state.channel);
+    // Si el medio ya no está activo, la venta en espera vuelve a efectivo.
+    setPayMethod(payMethods.some((m) => m.key === state.payMethod) ? state.payMethod : "efectivo");
+    setChannel(channels.includes(state.channel) ? state.channel : (channels[0] ?? "nequi"));
     setMixed({ ...EMPTY_MIXED, ...state.mixed });
     setError(null);
     setSuccess(null);
@@ -297,11 +395,13 @@ export function SaleCart({
 
   function resetSaleForm() {
     setCart({});
+    setGlobalDiscount(null);
+    setDiscountOpen({});
     setCustomerEmail("");
     setWhatsapp("");
     setCashReceived("");
     setPayMethod("efectivo");
-    setChannel("nequi");
+    setChannel(channels[0] ?? "nequi");
     setMixed({ ...EMPTY_MIXED });
     selectCustomerMode("none");
     setNewCustomer({ ...EMPTY_NEW_CUSTOMER });
@@ -364,6 +464,16 @@ export function SaleCart({
 
   async function handleConfirm() {
     if (lines.length === 0) return;
+    if (totals.error) {
+      setError(totals.error);
+      return;
+    }
+    if (overDiscountCap) {
+      setError(
+        `El descuento (${discountPercent.toFixed(1)}%) supera el máximo permitido para auxiliares (${maxDiscountPct}%)`
+      );
+      return;
+    }
     if (customerMode === "new" && !newCustomer.nombre.trim()) {
       setError("Ingresa el nombre del cliente");
       return;
@@ -392,18 +502,47 @@ export function SaleCart({
       return;
     }
 
-    const payment: PaymentInput =
-      payMethod === "efectivo"
-        ? { method: "efectivo" }
-        : payMethod === "transferencia"
-          ? { method: "transferencia", channel }
-          : {
-              method: "mixto",
-              efectivo: Number(mixed.efectivo) || 0,
-              nequi: Number(mixed.nequi) || 0,
-              daviplata: Number(mixed.daviplata) || 0,
-              llave: Number(mixed.llave) || 0,
-            };
+    if (creditAmount > 0) {
+      const hasCustomer =
+        (customerMode === "existing" && (selectedCustomer || customerNotFound)) || customerMode === "new";
+      if (!hasCustomer) {
+        setError("Para fiar, elige el cliente (Cliente existente o Cliente nuevo)");
+        return;
+      }
+      if (!isAdmin && !selectedCustomer) {
+        setError("Solo el administrador puede fiarle a un cliente nuevo");
+        return;
+      }
+      if (!isAdmin && selectedCustomer && credit) {
+        if (credit.limit === null) {
+          setError("Este cliente no tiene cupo de fiado; el administrador puede asignarlo en Clientes");
+          return;
+        }
+        if (credit.debt + creditAmount > credit.limit + 0.009) {
+          setError(
+            `El fiado supera el cupo del cliente (disponible ${currency.format(
+              Math.max(credit.limit - credit.debt, 0)
+            )})`
+          );
+          return;
+        }
+      }
+    }
+
+    let payment: PaymentInput;
+    if (payMethod === "transferencia") payment = { method: "transferencia", channel };
+    else if (payMethod === "mixto") {
+      payment = {
+        method: "mixto",
+        efectivo: mixedValue("efectivo"),
+        nequi: mixedValue("nequi"),
+        daviplata: mixedValue("daviplata"),
+        llave: mixedValue("llave"),
+        tarjeta: mixedValue("tarjeta"),
+        otro: mixedValue("otro"),
+        credito: mixedValue("credito"),
+      };
+    } else payment = { method: payMethod };
 
     setSubmitting(true);
     setError(null);
@@ -429,10 +568,18 @@ export function SaleCart({
         : "";
 
     const result = await createSale(
-      lines.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+      lines.map((line) => {
+        const d = toDiscount(line.discount);
+        return {
+          productId: line.product.id,
+          quantity: line.quantity,
+          ...(d ? { discountType: d.type, discountValue: d.value } : {}),
+        };
+      }),
       customer,
       payment,
-      customerEmail.trim() || undefined
+      customerEmail.trim() || undefined,
+      toDiscount(globalDiscount) ?? undefined
     );
 
     setSubmitting(false);
@@ -441,7 +588,8 @@ export function SaleCart({
       return;
     }
 
-    setSuccess(`Venta registrada por ${currency.format(result.total ?? 0)}${changeText}`);
+    const creditText = creditAmount > 0 ? ` · Fiado: ${currency.format(creditAmount)}` : "";
+    setSuccess(`Venta registrada por ${currency.format(result.total ?? 0)}${changeText}${creditText}`);
     setLastSaleId(result.saleId ?? null);
     setLastSalePhone(salePhone || null);
     // Espera a que termine cualquier guardado en curso y elimina la venta en
@@ -469,7 +617,12 @@ export function SaleCart({
 
   // Guardado automático (con pausa para no saturar la base).
   const draftState: SaleDraftState = {
-    lines: lines.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+    lines: lines.map((line) => ({
+      productId: line.product.id,
+      quantity: line.quantity,
+      discount: line.discount ?? null,
+    })),
+    globalDiscount,
     customerMode,
     selectedCustomer,
     newCustomer,
@@ -931,7 +1084,8 @@ export function SaleCart({
               <p className="text-sm text-brand-muted">Selecciona productos para agregarlos aquí.</p>
             )}
             {lines.map((line, index) => (
-              <div key={line.product.id} className="flex items-center justify-between gap-2 text-sm">
+              <div key={line.product.id} className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2 text-sm">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-brand-ink">{line.product.name}</p>
                   <p className="text-xs text-brand-muted">
@@ -939,7 +1093,11 @@ export function SaleCart({
                       computeLineTax(line.product.sale_price, 1, line.product.tax_rate, taxSettings)
                         .total
                     )}{" "}
-                    c/u · {currency.format(lineTaxes[index].total)}
+                    c/u ·{" "}
+                    {lineTaxes[index].lineDiscount > 0 && (
+                      <span className="line-through">{currency.format(lineTaxes[index].gross)}</span>
+                    )}{" "}
+                    {currency.format(lineTaxes[index].gross - lineTaxes[index].lineDiscount)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -965,13 +1123,71 @@ export function SaleCart({
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
+                    aria-label="Descuento a este producto"
+                    title="Descuento"
+                    onClick={() =>
+                      setDiscountOpen((o) => ({ ...o, [line.product.id]: !o[line.product.id] }))
+                    }
+                  >
+                    <Tag
+                      className={`h-3.5 w-3.5 ${line.discount && Number(line.discount.value) > 0 ? "text-brand-success" : "text-brand-muted"}`}
+                    />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
                     onClick={() => removeLine(line.product.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-brand-danger" />
                   </Button>
                 </div>
               </div>
+              {discountOpen[line.product.id] && (
+                <DiscountField
+                  label="Descuento"
+                  value={line.discount ?? null}
+                  onChange={(d) => setLineDiscount(line.product.id, d)}
+                  amountText={
+                    lineTaxes[index].lineDiscount > 0
+                      ? `− ${currency.format(lineTaxes[index].lineDiscount)}`
+                      : null
+                  }
+                />
+              )}
+              </div>
             ))}
+
+            {lines.length > 0 && (
+              <DiscountField
+                label="Descuento a toda la venta"
+                value={globalDiscount}
+                onChange={setGlobalDiscount}
+                amountText={
+                  totals.globalDiscount > 0 ? `− ${currency.format(totals.globalDiscount)}` : null
+                }
+              />
+            )}
+
+            {totals.discountTotal > 0 && (
+              <div className="flex flex-col gap-1 border-t border-brand-border pt-3 text-sm text-brand-muted">
+                <div className="flex items-center justify-between">
+                  <span>Antes de descuentos</span>
+                  <span>{currency.format(totals.gross)}</span>
+                </div>
+                <div className="flex items-center justify-between text-brand-success">
+                  <span>Descuentos ({discountPercent.toFixed(1)}%)</span>
+                  <span>− {currency.format(totals.discountTotal)}</span>
+                </div>
+                {overDiscountCap && (
+                  <p className="text-xs text-brand-danger">
+                    Supera el máximo para auxiliares ({maxDiscountPct}%). Pide al administrador que
+                    registre la venta.
+                  </p>
+                )}
+              </div>
+            )}
+            {totals.error && <p className="text-xs text-brand-danger">{totals.error}</p>}
 
             {taxTotal > 0 && (
               <div className="flex flex-col gap-1 border-t border-brand-border pt-3 text-sm text-brand-muted">
@@ -995,20 +1211,20 @@ export function SaleCart({
 
             <div className="flex flex-col gap-2 border-t border-brand-border pt-3">
               <p className="text-sm font-medium text-brand-ink">Método de pago</p>
-              <div className="flex gap-1 rounded-[var(--radius-brand-sm)] border border-brand-border p-1 text-xs">
-                {(Object.keys(PAY_METHOD_LABEL) as PayMethod[]).map((method) => (
+              <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-brand-sm)] border border-brand-border p-1 text-xs">
+                {payMethods.map((method) => (
                   <button
-                    key={method}
+                    key={method.key}
                     type="button"
                     onClick={() => {
-                      setPayMethod(method);
+                      setPayMethod(method.key);
                       setCashReceived("");
                     }}
-                    className={`flex-1 rounded-[var(--radius-brand-sm)] px-2 py-1 transition-colors ${
-                      payMethod === method ? "bg-brand text-brand-ink" : "text-brand-muted"
+                    className={`truncate rounded-[var(--radius-brand-sm)] px-2 py-1.5 transition-colors ${
+                      payMethod === method.key ? "bg-brand text-brand-ink" : "text-brand-muted"
                     }`}
                   >
-                    {PAY_METHOD_LABEL[method]}
+                    {method.label}
                   </button>
                 ))}
               </div>
@@ -1043,7 +1259,7 @@ export function SaleCart({
 
               {payMethod === "transferencia" && (
                 <div className="flex gap-1 text-xs">
-                  {(Object.keys(CHANNEL_LABEL) as TransferChannel[]).map((option) => (
+                  {channels.map((option) => (
                     <button
                       key={option}
                       type="button"
@@ -1062,16 +1278,9 @@ export function SaleCart({
 
               {payMethod === "mixto" && (
                 <div className="flex flex-col gap-2">
-                  {(
-                    [
-                      ["efectivo", "Efectivo"],
-                      ["nequi", "Nequi"],
-                      ["daviplata", "Daviplata"],
-                      ["llave", "Llave"],
-                    ] as const
-                  ).map(([key, label]) => (
+                  {mixedRows.map(({ key, label }) => (
                     <div key={key} className="flex items-center gap-2">
-                      <span className="w-20 text-sm text-brand-muted">{label}</span>
+                      <span className="w-20 truncate text-sm text-brand-muted">{label}</span>
                       <Input
                         type="number"
                         min={0}
@@ -1095,6 +1304,32 @@ export function SaleCart({
                         ? `Faltan ${currency.format(mixedRemaining)}`
                         : `Sobran ${currency.format(-mixedRemaining)}`}
                   </p>
+                </div>
+              )}
+
+              {creditAmount > 0 && (
+                <div className="flex flex-col gap-1 rounded-[var(--radius-brand-sm)] border border-brand bg-brand/10 p-3 text-xs text-brand-ink">
+                  <p className="text-sm font-medium">
+                    Fiado: {currency.format(creditAmount)} · vence {creditDue}
+                  </p>
+                  {customerMode === "none" && (
+                    <p className="text-brand-danger">Para fiar, elige Cliente existente o Cliente nuevo.</p>
+                  )}
+                  {selectedCustomer && credit && !credit.error && (
+                    <p className="text-brand-muted">
+                      Debe hoy {currency.format(credit.debt)}
+                      {credit.limit !== null
+                        ? ` · cupo ${currency.format(credit.limit)} · disponible ${currency.format(
+                            Math.max(credit.limit - credit.debt, 0)
+                          )}`
+                        : " · sin cupo asignado"}
+                    </p>
+                  )}
+                  {!isAdmin && (customerMode === "new" || customerNotFound) && (
+                    <p className="text-brand-danger">
+                      Solo el administrador puede fiarle a un cliente nuevo.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1143,6 +1378,55 @@ export function SaleCart({
         </div>
       )}
     </div>
+    </div>
+  );
+}
+
+/** Campo de descuento: tipo (% o $) y valor. Vacío = sin descuento. */
+function DiscountField({
+  label,
+  value,
+  onChange,
+  amountText,
+}: {
+  label: string;
+  value: DraftDiscount | null;
+  onChange: (value: DraftDiscount | null) => void;
+  /** Valor del descuento ya calculado, para mostrarlo al lado. */
+  amountText: string | null;
+}) {
+  const type = value?.type ?? "pct";
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="shrink-0 text-xs text-brand-muted">{label}</span>
+      <div className="flex shrink-0 rounded-[var(--radius-brand-sm)] border border-brand-border p-0.5 text-xs">
+        {(["pct", "amount"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange({ type: t, value: value?.value ?? "" })}
+            className={`rounded-[var(--radius-brand-sm)] px-2 py-0.5 ${
+              type === t ? "bg-brand text-brand-ink" : "text-brand-muted"
+            }`}
+          >
+            {t === "pct" ? "%" : "$"}
+          </button>
+        ))}
+      </div>
+      <Input
+        type="number"
+        min={0}
+        max={type === "pct" ? 100 : undefined}
+        step="any"
+        inputMode="decimal"
+        placeholder="0"
+        className="h-8 min-w-0"
+        value={value?.value ?? ""}
+        onChange={(event) =>
+          onChange(event.target.value === "" ? null : { type, value: event.target.value })
+        }
+      />
+      {amountText && <span className="shrink-0 text-xs text-brand-success">{amountText}</span>}
     </div>
   );
 }

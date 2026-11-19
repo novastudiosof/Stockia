@@ -58,6 +58,24 @@ export const invoiceSettingsSchema = z.object({
     .or(z.literal("")),
 });
 
+export const paymentSettingsSchema = z.object({
+  methods: z.array(z.enum(["nequi", "daviplata", "llave", "tarjeta", "otro", "credito"])),
+  otherLabel: z
+    .string()
+    .trim()
+    .min(1, "Escribe el nombre del medio de pago \"Otro\"")
+    .max(30, "El nombre del medio \"Otro\" es muy largo (máx. 30)"),
+  defaultCreditDays: z.coerce
+    .number()
+    .int("El plazo debe ser un número entero de días")
+    .min(0, "El plazo no puede ser negativo")
+    .max(365, "El plazo máximo es de 365 días"),
+  maxDiscountPct: z.coerce
+    .number()
+    .min(0, "El descuento máximo no puede ser negativo")
+    .max(100, "El descuento máximo no puede pasar del 100%"),
+});
+
 export const ALLOWED_LOGO_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
 export const MAX_LOGO_FILE_SIZE_MB = 3;
 

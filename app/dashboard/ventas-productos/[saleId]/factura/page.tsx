@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ThermalInvoice } from "@/components/ventas-productos/thermal-invoice";
 import type { Organization, Sale } from "@/lib/supabase/types";
 
-import { paymentDetail, paymentLabel } from "@/lib/payments";
+import { paymentText } from "@/lib/payments";
 
 const dateTime = new Intl.DateTimeFormat("es-CO", { dateStyle: "short", timeStyle: "short" });
 const currency = new Intl.NumberFormat("es-CO", {
@@ -55,11 +55,7 @@ export default async function FacturaVentaPage({
       total={saleRow.total}
       organization={org}
       soldBy={saleRow.sold_by_name}
-      paymentText={
-        saleRow.payment_method === "mixto"
-          ? `Mixto (${paymentDetail(saleRow, (n) => currency.format(n))})`
-          : paymentLabel(saleRow)
-      }
+      paymentText={paymentText(saleRow, (n) => currency.format(n))}
     />
   );
 }

@@ -1,5 +1,5 @@
 import { getInvoiceTicket } from "@/lib/actions/ventas-productos";
-import { paymentDetail, paymentLabel } from "@/lib/payments";
+import { paymentText } from "@/lib/payments";
 import { buildTicketPdf } from "@/lib/ticket-pdf";
 import { summarizeTaxes } from "@/lib/tax";
 
@@ -67,17 +67,18 @@ export async function buildInvoicePdf(
         name: item.name,
         quantity: item.quantity,
         unitPrice: money(
-          item.taxRate && item.taxRate > 0 ? item.subtotal / item.quantity : item.unitPrice
+          item.taxRate && item.taxRate > 0
+            ? (item.grossSubtotal ?? item.subtotal) / item.quantity
+            : item.unitPrice
         ),
-        subtotal: money(item.subtotal),
+        subtotal: money(item.grossSubtotal ?? item.subtotal),
+        discount: Number(item.lineDiscount ?? 0) > 0 ? money(Number(item.lineDiscount)) : undefined,
       })),
       subtotal: taxSum > 0 ? money(sale.total - taxSum) : undefined,
       taxLines: taxRows.map((row) => ({ label: row.label, amount: money(row.tax) })),
+      globalDiscount: Number(sale.global_discount ?? 0) > 0 ? money(Number(sale.global_discount)) : undefined,
       total: money(sale.total),
-      paymentText:
-        sale.payment_method === "mixto"
-          ? `Mixto (${paymentDetail(sale, money)})`
-          : paymentLabel(sale),
+      paymentText: paymentText(sale, money),
       footer: organization.invoice_footer,
     },
     widthMm

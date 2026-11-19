@@ -1,8 +1,8 @@
 import { requireProfile } from "@/lib/auth";
-import { requireModule, MODULE_KEYS } from "@/lib/modules";
+import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { InvoicesTable, type InvoiceRow } from "@/components/facturas/invoices-table";
-import type { Invoice, Movement } from "@/lib/supabase/types";
+import type { Invoice, Movement, Purchase } from "@/lib/supabase/types";
 
 // Tope por origen: la lista es de consulta; para algo más antiguo se filtra
 // por fecha. Se trae solo lo necesario, ya ordenado por fecha.
@@ -14,7 +14,10 @@ export default async function FacturasPage() {
   await requireModule(profile.organization_id, MODULE_KEYS.FACTURAS);
 
   const supabase = await createClient();
-  const [{ data: expenses }, { data: legacy }] = await Promise.all([
+  // Los soportes de compras (costos y proveedores) son solo del administrador.
+  const showPurchases =
+    profile.role === "owner" && (await isModuleEnabled(profile.organization_id, MODULE_KEYS.COMPRAS));
+  const [{ data: expenses }, { data: legacy }, { data: purchases }] = await Promise.all([
     // Facturas y soportes que se adjuntan al registrar un gasto.
     supabase
       .from("movements")
@@ -32,6 +35,16 @@ export default async function FacturasPage() {
       .not("file_path", "is", null)
       .order("occurred_at", { ascending: false })
       .limit(LIMIT),
+    // Facturas de proveedor adjuntas a una compra (migración 027).
+    showPurchases
+      ? supabase
+          .from("purchases")
+          .select("id, purchase_number, supplier_name, invoice_number, purchase_date, total, file_path, voided_at")
+          .eq("organization_id", profile.organization_id)
+          .not("file_path", "is", null)
+          .order("purchase_date", { ascending: false })
+          .limit(LIMIT)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const rows: InvoiceRow[] = [
@@ -63,6 +76,23 @@ export default async function FacturasPage() {
         filePath: i.file_path,
       })
     ),
+    ...((purchases as Pick<
+      Purchase,
+      "id" | "purchase_number" | "supplier_name" | "invoice_number" | "purchase_date" | "total" | "file_path" | "voided_at"
+    >[] | null) ?? []).map(
+      (p): InvoiceRow => ({
+        id: p.id,
+        source: "compra",
+        title: p.supplier_name || "Compra sin proveedor",
+        subtitle: [`Compra #${p.purchase_number}`, p.invoice_number ? `N.° ${p.invoice_number}` : "", p.voided_at ? "Anulada" : ""]
+          .filter(Boolean)
+          .join(" · "),
+        date: p.purchase_date,
+        amount: Number(p.total),
+        filePath: p.file_path,
+        href: `/dashboard/compras/${p.id}`,
+      })
+    ),
   ].sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1));
 
   return (
@@ -70,8 +100,10 @@ export default async function FacturasPage() {
       <div>
         <h1 className="text-2xl font-semibold text-brand-ink">Facturas</h1>
         <p className="text-sm text-brand-muted">
-          Aquí aparecen las facturas y soportes que adjuntas al registrar un gasto en Ventas y
-          Gastos. Puedes buscarlas, verlas y descargarlas.
+          Archivo de soportes: las facturas que adjuntas al registrar un gasto en Ventas y Gastos
+          {showPurchases ? " y las facturas de proveedor que adjuntas a una compra" : ""}. Puedes
+          buscarlas, verlas y descargarlas.
+          {showPurchases && " La mercancía se registra en Compras, no como gasto, para no contarla dos veces."}
         </p>
       </div>
       <InvoicesTable rows={rows} />

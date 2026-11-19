@@ -3,10 +3,11 @@ import ExcelJS from "exceljs";
 import { requireProfile } from "@/lib/auth";
 import { isModuleEnabled, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
+import { getStockSettings } from "@/lib/org-stock";
+import { effectiveMinStock, stockStatus } from "@/lib/stock";
 import type { Category, Product } from "@/lib/supabase/types";
 
 const currencyFormat = '"$"#,##0';
-const LOW_STOCK_THRESHOLD = 10;
 
 export async function GET() {
   const profile = await requireProfile();
@@ -18,7 +19,7 @@ export async function GET() {
   }
 
   const supabase = await createClient();
-  const [{ data: categories }, { data: products }] = await Promise.all([
+  const [{ data: categories }, { data: products }, stockSettings] = await Promise.all([
     supabase
       .from("categories")
       .select("*")
@@ -28,6 +29,7 @@ export async function GET() {
       .select("*")
       .eq("organization_id", profile.organization_id)
       .order("name", { ascending: true }),
+    getStockSettings(profile.organization_id),
   ]);
 
   const categoryById = new Map(
@@ -42,6 +44,7 @@ export async function GET() {
     { header: "Producto", key: "producto", width: 30 },
     { header: "Código de barras", key: "codigoBarras", width: 20 },
     { header: "Cantidad", key: "cantidad", width: 12 },
+    { header: "Stock mínimo", key: "minimo", width: 14 },
     { header: "Precio compra", key: "compra", width: 16 },
     { header: "Precio venta", key: "venta", width: 16 },
     { header: "Stock bajo", key: "bajo", width: 12 },
@@ -49,16 +52,18 @@ export async function GET() {
   sheet.getRow(1).font = { bold: true };
 
   for (const p of (products as Product[]) ?? []) {
+    const status = stockStatus(p.quantity, p.min_stock, stockSettings);
     const row = sheet.addRow({
       categoria: categoryById.get(p.category_id) || "—",
       producto: p.name,
       codigoBarras: p.barcode || "",
       cantidad: p.quantity,
+      minimo: effectiveMinStock(p.min_stock, stockSettings),
       compra: Number(p.purchase_price),
       venta: Number(p.sale_price),
-      bajo: p.quantity <= LOW_STOCK_THRESHOLD ? "Sí" : "No",
+      bajo: status === "agotado" ? "Agotado" : status === "bajo" ? "Sí" : "No",
     });
-    if (p.quantity <= LOW_STOCK_THRESHOLD) {
+    if (status !== "ok") {
       row.getCell("bajo").font = { color: { argb: "FFB91C1C" }, bold: true };
     }
   }

@@ -20,6 +20,9 @@ interface ClienteFormDialogProps {
   onOpenChange: (open: boolean) => void;
   cliente?: Cliente;
   action: (prev: { error?: string } | void, formData: FormData) => Promise<{ error?: string } | void>;
+  /** Muestra el cupo y el plazo del fiado (solo el administrador los edita). */
+  canEditCredit?: boolean;
+  defaultCreditDays?: number;
 }
 
 export function ClienteFormDialog({
@@ -27,6 +30,8 @@ export function ClienteFormDialog({
   onOpenChange,
   cliente,
   action,
+  canEditCredit = false,
+  defaultCreditDays = 30,
 }: ClienteFormDialogProps) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const formRef = React.useRef<HTMLFormElement>(null);
@@ -88,6 +93,45 @@ export function ClienteFormDialog({
             <Label htmlFor="direccion">Dirección</Label>
             <Input id="direccion" name="direccion" defaultValue={cliente?.direccion ?? ""} />
           </div>
+
+          {canEditCredit && (
+            <div className="flex flex-col gap-3 rounded-[var(--radius-brand-sm)] border border-brand-border p-3">
+              <p className="text-sm font-medium text-brand-ink">Fiado (opcional)</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="creditLimit">Cupo máximo</Label>
+                  <Input
+                    id="creditLimit"
+                    name="creditLimit"
+                    type="number"
+                    min={0}
+                    step="1"
+                    inputMode="numeric"
+                    placeholder="Sin cupo"
+                    defaultValue={cliente?.credit_limit ?? ""}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="creditDays">Plazo para pagar (días)</Label>
+                  <Input
+                    id="creditDays"
+                    name="creditDays"
+                    type="number"
+                    min={0}
+                    max={365}
+                    step="1"
+                    inputMode="numeric"
+                    placeholder={`El del negocio (${defaultCreditDays})`}
+                    defaultValue={cliente?.credit_days ?? ""}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-brand-muted">
+                Con cupo, los auxiliares pueden fiarle hasta ese valor. Sin cupo, solo el
+                administrador le fía.
+              </p>
+            </div>
+          )}
 
           {state?.error && <p className="text-sm text-brand-danger">{state.error}</p>}
 

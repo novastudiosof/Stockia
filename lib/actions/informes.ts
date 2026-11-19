@@ -6,6 +6,8 @@ import { friendlyDbError } from "@/lib/db-errors";
 import { requireModule, MODULE_KEYS } from "@/lib/modules";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import { createClient } from "@/lib/supabase/server";
+import { getStockSettings } from "@/lib/org-stock";
+import { effectiveMinStock, stockStatus } from "@/lib/stock";
 import type {
   Category,
   Product,
@@ -89,13 +91,17 @@ export type SalesPreviewRow = Pick<
   | "pay_nequi"
   | "pay_daviplata"
   | "pay_llave"
+  | "pay_tarjeta"
+  | "pay_otro"
+  | "pay_otro_label"
+  | "pay_credito"
   | "sold_by_name"
   | "voided_at"
   | "void_kind"
 >;
 
 const SALES_COLUMNS =
-  "id, sale_number, created_at, customer_snapshot, total, payment_method, pay_cash, pay_nequi, pay_daviplata, pay_llave, sold_by_name, voided_at, void_kind";
+  "id, sale_number, created_at, customer_snapshot, total, payment_method, pay_cash, pay_nequi, pay_daviplata, pay_llave, pay_tarjeta, pay_otro, pay_otro_label, pay_credito, sold_by_name, voided_at, void_kind";
 
 export async function previewSales(
   filters: SalesPreviewFilters,
@@ -243,7 +249,7 @@ export async function previewMovements(
 export type InventoryPreviewRow = Pick<
   Product,
   "id" | "name" | "barcode" | "quantity" | "purchase_price" | "sale_price"
-> & { category: string };
+> & { category: string; minStock: number; low: boolean };
 
 export async function previewInventory(
   filters: { query?: string },
@@ -256,7 +262,8 @@ export async function previewInventory(
   let query = supabase
     .from("products")
     .select(
-      "id, name, barcode, quantity, purchase_price, sale_price, category_id",
+      // "*" para que funcione con y sin la migración 027 (min_stock).
+      "*",
       cursor ? undefined : { count: "exact" }
     )
     .eq("organization_id", ctx.organizationId)
@@ -273,9 +280,10 @@ export async function previewInventory(
     query = query.or(`name.gt.${quote(name)},and(name.eq.${quote(name)},id.gt.${id})`);
   }
 
-  const [{ data, error, count }, { data: categories }] = await Promise.all([
+  const [{ data, error, count }, { data: categories }, stockSettings] = await Promise.all([
     query,
     supabase.from("categories").select("id, name").eq("organization_id", ctx.organizationId),
+    getStockSettings(ctx.organizationId),
   ]);
   if (error) {
     return {
@@ -288,13 +296,20 @@ export async function previewInventory(
   const categoryName = new Map(
     ((categories as Pick<Category, "id" | "name">[]) ?? []).map((c) => [c.id, c.name])
   );
-  const all = (data as unknown as (Omit<InventoryPreviewRow, "category"> & { category_id: string })[]) ?? [];
+  const all = (data as unknown as Product[]) ?? [];
   const page = all.slice(0, PAGE_SIZE);
   const last = page[page.length - 1];
   return {
-    rows: page.map(({ category_id, ...rest }) => ({
-      ...rest,
-      category: categoryName.get(category_id) ?? "—",
+    rows: page.map((p) => ({
+      id: p.id,
+      name: p.name,
+      barcode: p.barcode,
+      quantity: p.quantity,
+      purchase_price: p.purchase_price,
+      sale_price: p.sale_price,
+      category: categoryName.get(p.category_id) ?? "—",
+      minStock: effectiveMinStock(p.min_stock, stockSettings),
+      low: stockStatus(p.quantity, p.min_stock, stockSettings) !== "ok",
     })),
     nextCursor: all.length > PAGE_SIZE && last ? `${last.name}|${last.id}` : null,
     total: cursor ? undefined : (count ?? page.length),

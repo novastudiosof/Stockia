@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
+
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CategoryCard } from "@/components/catalogo/category-card";
@@ -33,6 +36,10 @@ export default async function CatalogoPage() {
     countsByCategory.set(row.category_id, (countsByCategory.get(row.category_id) ?? 0) + 1);
   }
 
+  // Sin la migración 027 la función no existe y simplemente no se muestra el aviso.
+  const { data: lowStock } = await supabase.rpc("low_stock_count");
+  const lowStockCount = Number(lowStock ?? 0);
+
   const list = (categories as Category[]) ?? [];
   const canEdit = profile.role === "owner";
 
@@ -49,6 +56,22 @@ export default async function CatalogoPage() {
           <AddCategoryButton businessType={businessType} />
         )}
       </div>
+
+      {lowStockCount > 0 && (
+        <Link
+          href="/dashboard/catalogo/por-agotarse"
+          className="flex items-center gap-3 rounded-[var(--radius-brand-md)] border border-brand-danger/40 bg-brand-danger/5 p-3 text-sm text-brand-ink hover:bg-brand-danger/10"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-brand-danger" />
+          <span className="flex-1">
+            <span className="font-semibold">
+              {lowStockCount} {lowStockCount === 1 ? "producto está" : "productos están"} por agotarse o agotados.
+            </span>{" "}
+            {canEdit ? "Mira la lista y el pedido sugerido." : "Mira la lista para avisarle al administrador."}
+          </span>
+          <span className="font-medium underline">Ver</span>
+        </Link>
+      )}
 
       {list.length > 0 && <ProductSearch />}
 

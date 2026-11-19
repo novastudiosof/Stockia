@@ -8,7 +8,7 @@ import { requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { friendlyDbError } from "@/lib/db-errors";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
-import { clienteSchema } from "@/lib/validations/clientes";
+import { clienteCreditSchema, clienteSchema } from "@/lib/validations/clientes";
 import type { Cliente } from "@/lib/supabase/types";
 
 // A diferencia de otras acciones del proyecto, create/updateCliente siempre
@@ -70,6 +70,19 @@ export async function createCliente(
     direccion: formData.get("direccion") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  const credit = clienteCreditSchema.safeParse({
+    creditLimit: formData.get("creditLimit") ?? "",
+    creditDays: formData.get("creditDays") ?? "",
+  });
+  if (!credit.success) return { error: credit.error.issues[0]?.message };
+  // El cupo y el plazo del fiado solo los fija el administrador.
+  const creditFields =
+    profile.role === "owner"
+      ? {
+          credit_limit: credit.data.creditLimit ?? null,
+          credit_days: credit.data.creditDays ?? null,
+        }
+      : {};
 
   const supabase = await createClient();
   const { error } = await supabase.from("clientes").insert({
@@ -80,11 +93,13 @@ export async function createCliente(
     telefono: parsed.data.telefono || null,
     email: parsed.data.email || null,
     direccion: parsed.data.direccion || null,
+    ...creditFields,
   });
   if (error) return { error: friendlyDbError(error, "createCliente", "No se pudo crear el cliente") };
 
   await logActivity(profile, "Creó cliente", parsed.data.nombre);
   revalidatePath("/dashboard/clientes");
+  revalidatePath("/dashboard/cartera", "layout");
   return {};
 }
 
@@ -107,6 +122,19 @@ export async function updateCliente(
     direccion: formData.get("direccion") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  const credit = clienteCreditSchema.safeParse({
+    creditLimit: formData.get("creditLimit") ?? "",
+    creditDays: formData.get("creditDays") ?? "",
+  });
+  if (!credit.success) return { error: credit.error.issues[0]?.message };
+  // El cupo y el plazo del fiado solo los fija el administrador.
+  const creditFields =
+    profile.role === "owner"
+      ? {
+          credit_limit: credit.data.creditLimit ?? null,
+          credit_days: credit.data.creditDays ?? null,
+        }
+      : {};
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -118,12 +146,14 @@ export async function updateCliente(
       telefono: parsed.data.telefono || null,
       email: parsed.data.email || null,
       direccion: parsed.data.direccion || null,
+      ...creditFields,
     })
     .eq("id", clienteId);
   if (error) return { error: friendlyDbError(error, "updateCliente", "No se pudo actualizar el cliente") };
 
   await logActivity(profile, "Editó cliente", parsed.data.nombre);
   revalidatePath("/dashboard/clientes");
+  revalidatePath("/dashboard/cartera", "layout");
   return {};
 }
 
@@ -136,6 +166,7 @@ export async function deleteCliente(clienteId: string, clienteNombre: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("clientes").delete().eq("id", clienteId);
   if (error) return { error: friendlyDbError(error, "deleteCliente", "No se pudo eliminar el cliente") };
+  revalidatePath("/dashboard/cartera", "layout");
 
   await logActivity(profile, "Eliminó cliente", clienteNombre);
   revalidatePath("/dashboard/clientes");

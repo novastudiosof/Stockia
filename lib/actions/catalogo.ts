@@ -14,6 +14,9 @@ import {
 } from "@/lib/category-image";
 import { sanitizeOrFilterTerm } from "@/lib/postgrest-filter";
 import { parseTaxOption } from "@/lib/tax";
+import { minStockField } from "@/lib/validations/stock";
+import { getStockSettings } from "@/lib/org-stock";
+import { stockStatus } from "@/lib/stock";
 import {
   categorySchema,
   productSchema,
@@ -178,6 +181,8 @@ export async function createProduct(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
   const tax = parsed.data.tax ? parseTaxOption(parsed.data.tax) : null;
   if (parsed.data.tax && !tax) return { error: "Impuesto inválido" };
+  const minStock = minStockField.safeParse(formData.get("minStock") ?? "");
+  if (!minStock.success) return { error: minStock.error.issues[0]?.message };
 
   const supabase = await createClient();
 
@@ -222,9 +227,27 @@ export async function createProduct(
     }
   }
 
+  if (minStock.data !== null) {
+    const minError = await saveMinStock(supabase, (product as { id: string }).id, minStock.data);
+    if (minError) return { error: `El producto se creó, pero ${minError}` };
+  }
+
   await logActivity(profile, "Creó producto", parsed.data.name);
-  revalidatePath(`/dashboard/catalogo/${categoryId}`);
-  revalidatePath("/dashboard/catalogo");
+  revalidatePath("/dashboard", "layout");
+}
+
+/** El mínimo se guarda aparte para que, sin la migración 027, el resto del producto sí se guarde. */
+async function saveMinStock(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  productId: string,
+  value: number | null
+): Promise<string | null> {
+  const { error } = await supabase.from("products").update({ min_stock: value }).eq("id", productId);
+  if (!error) return null;
+  return friendlyDbError(error, "saveMinStock", "no se pudo guardar el stock mínimo", {
+    PGRST204: "falta ejecutar la migración 027 en Supabase para guardar el stock mínimo",
+    "42703": "falta ejecutar la migración 027 en Supabase para guardar el stock mínimo",
+  });
 }
 
 export async function updateProduct(
@@ -247,6 +270,9 @@ export async function updateProduct(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
   const tax = parsed.data.tax ? parseTaxOption(parsed.data.tax) : null;
   if (parsed.data.tax && !tax) return { error: "Impuesto inválido" };
+  const hasMinStock = formData.has("minStock");
+  const minStock = minStockField.safeParse(formData.get("minStock") ?? "");
+  if (!minStock.success) return { error: minStock.error.issues[0]?.message };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -268,8 +294,14 @@ export async function updateProduct(
     };
   }
 
+  if (hasMinStock) {
+    const minError = await saveMinStock(supabase, productId, minStock.data);
+    if (minError) return { error: `El producto se guardó, pero ${minError}` };
+  }
+
   await logActivity(profile, "Editó producto", parsed.data.name);
   revalidatePath(`/dashboard/catalogo/${categoryId}`);
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function deleteProduct(
@@ -453,6 +485,8 @@ export type ProductSearchResult = {
   category_id: string;
   category_name: string;
   category_icon: string;
+  /** En su mínimo o agotado (según las alertas del negocio). */
+  low: boolean;
 };
 
 /** Busca productos por nombre o código de barras en todas las categorías. */
@@ -464,13 +498,17 @@ export async function searchProducts(query: string): Promise<ProductSearchResult
   if (safe.length < 2) return [];
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("products")
-    .select("id, name, barcode, quantity, sale_price, category_id, categories(name, icon)")
-    .eq("organization_id", profile.organization_id)
-    .or(`name.ilike.%${safe}%,barcode.ilike.%${safe}%`)
-    .order("name", { ascending: true })
-    .limit(30);
+  const [{ data }, stockSettings] = await Promise.all([
+    supabase
+      .from("products")
+      // "*" para que funcione con y sin la migración 027 (min_stock).
+      .select("*, categories(name, icon)")
+      .eq("organization_id", profile.organization_id)
+      .or(`name.ilike.%${safe}%,barcode.ilike.%${safe}%`)
+      .order("name", { ascending: true })
+      .limit(30),
+    getStockSettings(profile.organization_id),
+  ]);
 
   type Row = {
     id: string;
@@ -479,6 +517,7 @@ export async function searchProducts(query: string): Promise<ProductSearchResult
     quantity: number;
     sale_price: number;
     category_id: string;
+    min_stock?: number | null;
     categories: { name: string; icon: string } | { name: string; icon: string }[] | null;
   };
 
@@ -493,6 +532,7 @@ export async function searchProducts(query: string): Promise<ProductSearchResult
       category_id: row.category_id,
       category_name: category?.name ?? "",
       category_icon: category?.icon ?? "",
+      low: stockStatus(row.quantity, row.min_stock, stockSettings) !== "ok",
     };
   });
 }

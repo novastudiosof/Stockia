@@ -14,8 +14,6 @@ import {
 } from "@/components/informes/report-preview-dialog";
 import { previewInventory, type InventoryPreviewRow } from "@/lib/actions/informes";
 
-const LOW_STOCK_THRESHOLD = 10;
-
 const currency = new Intl.NumberFormat("es-CO", {
   style: "currency",
   currency: "COP",
@@ -29,12 +27,13 @@ const COLUMNS: PreviewColumn<InventoryPreviewRow>[] = [
   {
     header: "Cantidad",
     cell: (p) =>
-      p.quantity <= LOW_STOCK_THRESHOLD ? (
+      p.low ? (
         <Badge variant="danger">{p.quantity}</Badge>
       ) : (
         p.quantity
       ),
   },
+  { header: "Mínimo", cell: (p) => p.minStock },
   { header: "Compra", cell: (p) => currency.format(p.purchase_price) },
   { header: "Venta", cell: (p) => currency.format(p.sale_price) },
 ];

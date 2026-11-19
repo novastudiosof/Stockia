@@ -28,7 +28,11 @@ panel de super administrador.
    `020_borradores_venta.sql`,
    `021_devoluciones_en_su_dia.sql`,
    `022_bloquea_ventas_caja_cerrada.sql`,
-   `023_impuestos_y_datos_fiscales.sql`.
+   `023_impuestos_y_datos_fiscales.sql`,
+   `024_fiado_cartera_medios_pago.sql`,
+   `025_descuentos.sql`,
+   `026_compras_proveedores.sql`,
+   `027_soporte_compras_stock_minimo.sql`.
 
 ## 2. Crear el primer super administrador
 

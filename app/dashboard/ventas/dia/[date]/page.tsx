@@ -79,6 +79,9 @@ export default async function DetalleDiaPage({
     { label: "Nequi", amount: net((s) => Number(s.pay_nequi)) },
     { label: "Daviplata", amount: net((s) => Number(s.pay_daviplata)) },
     { label: "Llave", amount: net((s) => Number(s.pay_llave)) },
+    { label: "Tarjeta", amount: net((s) => Number(s.pay_tarjeta ?? 0)) },
+    { label: "Otro", amount: net((s) => Number(s.pay_otro ?? 0)) },
+    { label: "Fiado", amount: net((s) => Number(s.pay_credito ?? 0)) },
   ].filter((m) => m.amount !== 0);
 
   return (

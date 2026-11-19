@@ -1,13 +1,23 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { requireRole } from "@/lib/auth";
+import { getCurrentOrganization, requireRole } from "@/lib/auth";
+import { paymentSettingsOf } from "@/lib/payments";
 import { isModuleEnabled, requireModule, MODULE_KEYS } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 import { CashClosing } from "@/components/ventas/cash-closing";
 import type { CashDay, CashDaySummary } from "@/lib/supabase/types";
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+const SUMMARY_KEYS: (keyof CashDaySummary)[] = [
+  "sales_count", "sales_total", "sales_cash", "sales_nequi", "sales_daviplata", "sales_llave",
+  "sales_tarjeta", "sales_otro", "sales_credito", "manual_sales", "expenses",
+  "returns_count", "returns_total", "returns_cash", "returns_nequi", "returns_daviplata",
+  "returns_llave", "returns_tarjeta", "returns_otro", "returns_credito",
+  "abonos_count", "abonos_total", "abonos_cash", "abonos_nequi", "abonos_daviplata",
+  "abonos_llave", "abonos_tarjeta", "abonos_otro", "purchases_cash", "supplier_payments_cash",
+];
 
 function todayBogota() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
@@ -29,7 +39,7 @@ export default async function CierreCajaPage({
   const supabase = await createClient();
   const salesEnabled = await isModuleEnabled(profile.organization_id, MODULE_KEYS.VENTAS_PRODUCTOS);
 
-  const [{ data: cashDay }, { data: summary }] = await Promise.all([
+  const [{ data: cashDay }, { data: summary }, org] = await Promise.all([
     supabase
       .from("cash_days")
       .select("*")
@@ -37,24 +47,14 @@ export default async function CierreCajaPage({
       .eq("day", day)
       .maybeSingle(),
     supabase.rpc("cash_day_summary", { p_day: day }),
+    getCurrentOrganization(profile.organization_id),
   ]);
 
-  const live = (summary as CashDaySummary[] | null)?.[0] ?? {
-    sales_count: 0,
-    sales_total: 0,
-    sales_cash: 0,
-    sales_nequi: 0,
-    sales_daviplata: 0,
-    sales_llave: 0,
-    manual_sales: 0,
-    expenses: 0,
-    returns_count: 0,
-    returns_total: 0,
-    returns_cash: 0,
-    returns_nequi: 0,
-    returns_daviplata: 0,
-    returns_llave: 0,
-  };
+  // Si falta alguna cifra (migración pendiente) queda en 0.
+  const raw = ((summary as CashDaySummary[] | null)?.[0] ?? {}) as Partial<Record<keyof CashDaySummary, unknown>>;
+  const live = Object.fromEntries(
+    SUMMARY_KEYS.map((key) => [key, Number(raw[key] ?? 0)])
+  ) as CashDaySummary;
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,23 +76,9 @@ export default async function CierreCajaPage({
         day={day}
         today={today}
         cashDay={(cashDay as CashDay | null) ?? null}
-        live={{
-          sales_count: Number(live.sales_count),
-          sales_total: Number(live.sales_total),
-          sales_cash: Number(live.sales_cash),
-          sales_nequi: Number(live.sales_nequi),
-          sales_daviplata: Number(live.sales_daviplata),
-          sales_llave: Number(live.sales_llave),
-          manual_sales: Number(live.manual_sales),
-          expenses: Number(live.expenses),
-          returns_count: Number(live.returns_count),
-          returns_total: Number(live.returns_total),
-          returns_cash: Number(live.returns_cash),
-          returns_nequi: Number(live.returns_nequi),
-          returns_daviplata: Number(live.returns_daviplata),
-          returns_llave: Number(live.returns_llave),
-        }}
+        live={live}
         salesEnabled={salesEnabled}
+        otherLabel={paymentSettingsOf(org).otherLabel}
       />
     </div>
   );

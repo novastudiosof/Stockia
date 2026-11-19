@@ -6,22 +6,22 @@ import { VentasProductosReportCard } from "@/components/informes/ventas-producto
 import { InventarioReportCard } from "@/components/informes/inventario-report-card";
 import { UtilidadReportCard } from "@/components/informes/utilidad-report-card";
 
-const LOW_STOCK_THRESHOLD = 10;
-
 export default async function InformesPage() {
   const profile = await requireRole("owner");
   if (!profile.organization_id) return null;
   await requireModule(profile.organization_id, MODULE_KEYS.INFORMES);
 
   const supabase = await createClient();
-  const { data: products } = await supabase
-    .from("products")
-    .select("quantity")
-    .eq("organization_id", profile.organization_id);
+  const [{ count }, { data: lowStock }] = await Promise.all([
+    supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", profile.organization_id),
+    supabase.rpc("low_stock_count"),
+  ]);
 
-  const totalProductos = products?.length ?? 0;
-  const productosStockBajo =
-    products?.filter((p) => p.quantity <= LOW_STOCK_THRESHOLD).length ?? 0;
+  const totalProductos = count ?? 0;
+  const productosStockBajo = Number(lowStock ?? 0);
 
   return (
     <div className="flex flex-col gap-6">

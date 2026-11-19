@@ -15,8 +15,10 @@ import {
   Receipt,
   ShieldCheck,
   ShoppingCart,
+  Truck,
   User,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 
@@ -35,8 +37,13 @@ export interface SidebarNavItem {
     | "superadmin"
     | "ventasProductos"
     | "informes"
-    | "clientes";
+    | "clientes"
+    | "cartera"
+    | "compras";
   locked?: boolean;
+  /** Contador al lado del nombre (p. ej. productos por agotarse). */
+  badge?: number;
+  badgeLabel?: string;
 }
 
 const ICONS = {
@@ -50,6 +57,8 @@ const ICONS = {
   ventasProductos: ShoppingCart,
   informes: BarChart3,
   clientes: Users,
+  cartera: Wallet,
+  compras: Truck,
 };
 
 interface SidebarProps {
@@ -122,6 +131,15 @@ export function Sidebar({ fullName, roleLabel, items, logoUrl, orgName }: Sideba
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span className="truncate">{item.label}</span>
+              {!item.locked && !!item.badge && item.badge > 0 && (
+                <span
+                  className="ml-auto rounded-full bg-brand-danger px-2 py-0.5 text-xs font-semibold text-white"
+                  title={item.badgeLabel}
+                  aria-label={item.badgeLabel}
+                >
+                  {item.badge > 99 ? "99+" : item.badge}
+                </span>
+              )}
               {item.locked && <span className="ml-auto text-xs">🔒</span>}
             </Link>
           );

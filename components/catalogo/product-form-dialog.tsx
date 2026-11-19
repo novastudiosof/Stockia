@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Product } from "@/lib/supabase/types";
 import { TAX_OPTIONS, taxOptionValue, type TaxSettings } from "@/lib/tax";
+import type { StockSettings } from "@/lib/stock";
 
 interface ProductFormDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface ProductFormDialogProps {
   product?: Product;
   action: (prev: { error?: string } | void, formData: FormData) => Promise<{ error?: string } | void>;
   taxSettings: TaxSettings;
+  stockSettings: StockSettings;
 }
 
 export function ProductFormDialog({
@@ -30,6 +32,7 @@ export function ProductFormDialog({
   product,
   action,
   taxSettings,
+  stockSettings,
 }: ProductFormDialogProps) {
   const formRef = React.useRef<HTMLFormElement>(null);
 
@@ -122,6 +125,23 @@ export function ProductFormDialog({
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="barcode">Código de barras</Label>
               <Input id="barcode" name="barcode" defaultValue={product?.barcode ?? ""} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="minStock">Stock mínimo</Label>
+              <Input
+                id="minStock"
+                name="minStock"
+                type="number"
+                min={0}
+                step="1"
+                placeholder={`General (${stockSettings.defaultMinStock})`}
+                defaultValue={product?.min_stock ?? ""}
+              />
+              <p className="text-xs text-brand-muted">
+                {stockSettings.alertsEnabled
+                  ? "Avisa cuando quede en esta cantidad o menos. Vacío = usa el mínimo general de Mi Cuenta."
+                  : "Las alertas de stock están apagadas en Mi Cuenta."}
+              </p>
             </div>
           </div>
 

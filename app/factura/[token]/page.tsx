@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ThermalInvoice } from "@/components/ventas-productos/thermal-invoice";
-import { paymentDetail, paymentLabel } from "@/lib/payments";
+import { paymentText } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Organization, Sale } from "@/lib/supabase/types";
 
@@ -67,11 +67,7 @@ export default async function FacturaPublicaPage({
       total={saleRow.total}
       organization={org}
       soldBy={saleRow.sold_by_name}
-      paymentText={
-        saleRow.payment_method === "mixto"
-          ? `Mixto (${paymentDetail(saleRow, (n) => currency.format(n))})`
-          : paymentLabel(saleRow)
-      }
+      paymentText={paymentText(saleRow, (n) => currency.format(n))}
     />
   );
 }

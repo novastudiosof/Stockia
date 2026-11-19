@@ -262,6 +262,9 @@ export function SalesHistory({ sales, canVoid }: SalesHistoryProps) {
             <p className="mt-1 text-xs text-brand-muted">
               {sale.customer_snapshot && <>Cliente: {sale.customer_snapshot.nombre} · </>}
               Vendido por: {sale.sold_by_name ?? "—"} · Pago: {paymentLabel(sale)}
+              {Number(sale.discount_total ?? 0) > 0 && (
+                <> · Descuento: {currency.format(Number(sale.discount_total))}</>
+              )}
               {sale.void_kind === "devolucion" && sale.void_reason && <> · Motivo: {sale.void_reason}</>}
             </p>
             <ul className="mt-2 flex flex-col gap-1 text-sm text-brand-muted">
